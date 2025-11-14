@@ -1,0 +1,9 @@
+{
+  "/(auth)/sign-in/page": "app/(auth)/sign-in/page.js",
+  "/(dashboard)/advert-list/page": "app/(dashboard)/advert-list/page.js",
+  "/(dashboard)/channel-list/page": "app/(dashboard)/channel-list/page.js",
+  "/(dashboard)/content-list/page": "app/(dashboard)/content-list/page.js",
+  "/(dashboard)/page": "app/(dashboard)/page.js",
+  "/(dashboard)/user/page": "app/(dashboard)/user/page.js",
+  "/api/create-upload/route": "app/api/create-upload/route.js"
+}

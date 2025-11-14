@@ -1,0 +1,3 @@
+{
+  "/(dashboard)/season/[seasonId]/episodes/page": "app/(dashboard)/season/[seasonId]/episodes/page.js"
+}

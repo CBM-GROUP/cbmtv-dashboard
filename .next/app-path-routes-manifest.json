@@ -1,0 +1,23 @@
+{
+  "/(auth)/sign-in/page": "/sign-in",
+  "/(auth)/sign-up/page": "/sign-up",
+  "/(dashboard)/advert-list/page": "/advert-list",
+  "/(dashboard)/blog/page": "/blog",
+  "/(dashboard)/channel-list/page": "/channel-list",
+  "/(dashboard)/content-list/page": "/content-list",
+  "/(dashboard)/content/[contentId]/miniseries-episodes/page": "/content/[contentId]/miniseries-episodes",
+  "/(dashboard)/content/[contentId]/seasons/page": "/content/[contentId]/seasons",
+  "/(dashboard)/page": "/",
+  "/(dashboard)/products/page": "/products",
+  "/(dashboard)/season/[seasonId]/episodes/page": "/season/[seasonId]/episodes",
+  "/(dashboard)/user-management/page": "/user-management",
+  "/(dashboard)/user/page": "/user",
+  "/_not-found/page": "/_not-found",
+  "/api/asset-details/route": "/api/asset-details",
+  "/api/content/miniseries/[id]/route": "/api/content/miniseries/[id]",
+  "/api/content/miniseries/route": "/api/content/miniseries",
+  "/api/create-upload/route": "/api/create-upload",
+  "/api/upload-status/route": "/api/upload-status",
+  "/stream/page": "/stream",
+  "/upload/page": "/upload"
+}

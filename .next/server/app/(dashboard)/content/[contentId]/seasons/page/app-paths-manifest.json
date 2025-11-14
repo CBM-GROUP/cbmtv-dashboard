@@ -1,0 +1,3 @@
+{
+  "/(dashboard)/content/[contentId]/seasons/page": "app/(dashboard)/content/[contentId]/seasons/page.js"
+}

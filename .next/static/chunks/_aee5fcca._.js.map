@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///home/techmessiah/Work/Projects/CBMTV/cbmtv-dashboard-nextjs/src/app/%28dashboard%29/page.tsx"],"sourcesContent":["'use client';\n\nimport apiClient from '@/services/api';\nimport { Button } from '@mui/material';\n\n// import { DashboardPage } from \"@\";\n\nexport default function Page() {\n  const handleSync = async () => {\n    const response = await apiClient.get('/api/content/search');\n    alert(response?.data?.message);\n  };\n\n  return (\n    <section className=\"px-6 lg:px-10\">\n      <Button variant=\"contained\" color=\"primary\" onClick={() => handleSync()}>\n        Sync Search Data\n      </Button>\n    </section>\n  );\n}\n"],"names":[],"mappings":";;;;;AAEA;AACA;AAHA;;;;AAOe,SAAS;IACtB,MAAM,aAAa;YAEX;QADN,MAAM,WAAW,MAAM,oIAAS,CAAC,GAAG,CAAC;QACrC,MAAM,qBAAA,gCAAA,iBAAA,SAAU,IAAI,cAAd,qCAAA,eAAgB,OAAO;IAC/B;IAEA,qBACE,4TAAC;QAAQ,WAAU;kBACjB,cAAA,4TAAC,+ZAAM;YAAC,SAAQ;YAAY,OAAM;YAAU,SAAS,IAAM;sBAAc;;;;;;;;;;;AAK/E;KAbwB","debugId":null}}]
+}

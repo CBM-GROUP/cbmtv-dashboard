@@ -1,0 +1,3 @@
+{
+  "/(dashboard)/content/[contentId]/miniseries-episodes/page": "app/(dashboard)/content/[contentId]/miniseries-episodes/page.js"
+}
