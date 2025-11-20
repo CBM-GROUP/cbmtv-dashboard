@@ -47,7 +47,7 @@ export function SeasonListView() {
   const fetchSeasons = async () => {
     try {
       const response = await apiClient.get(
-        `/api/content/seasons/?content=${contentId}`,
+        `/api/content/seasons/?content=${contentId}`
       );
       setSeasons(response.data);
     } catch (error) {
@@ -65,7 +65,7 @@ export function SeasonListView() {
     setFormData(
       item
         ? { title: item.title, season_number: item.season_number }
-        : { title: "", season_number: null },
+        : { title: "", season_number: null }
     );
     setOpen(true);
   };
@@ -81,13 +81,13 @@ export function SeasonListView() {
 
   const handleChangePage = (
     event: React.MouseEvent<HTMLButtonElement> | null,
-    newPage: number,
+    newPage: number
   ) => {
     setPage(newPage);
   };
 
   const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
@@ -128,15 +128,14 @@ export function SeasonListView() {
         }}
       >
         <Typography variant="h4">Seasons</Typography>
-        {user?.role === "admin" && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleOpen()}
-          >
-            Create Season
-          </Button>
-        )}
+
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => handleOpen()}
+        >
+          Create Season
+        </Button>
       </Box>
       <TableContainer component={Card}>
         <Table>

@@ -75,7 +75,7 @@ export function EpisodeListView() {
       if (data.data?.playback_ids?.[0]?.id) {
         const playbackId = data.data.playback_ids[0].id;
         const playbackUrl = `https://stream.mux.com/${playbackId}.m3u8`;
-        setFormData(prev => ({ ...prev, file_url: playbackUrl }));
+        setFormData((prev) => ({ ...prev, file_url: playbackUrl }));
       }
     } catch (error) {
       console.error("Failed to get asset details:", error);
@@ -114,7 +114,7 @@ export function EpisodeListView() {
   const fetchEpisodes = async () => {
     try {
       const response = await apiClient.get(
-        `/api/content/episodes/?season=${seasonId}`,
+        `/api/content/episodes/?season=${seasonId}`
       );
       setEpisodes(response.data);
     } catch (error) {
@@ -136,7 +136,7 @@ export function EpisodeListView() {
             episode_number: item.episode_number,
             file_url: item.file_url || "",
           }
-        : { title: "", episode_number: null, file_url: "" },
+        : { title: "", episode_number: null, file_url: "" }
     );
     setOpen(true);
   };
@@ -186,15 +186,14 @@ export function EpisodeListView() {
         }}
       >
         <Typography variant="h4">Episodes</Typography>
-        {user?.role === "admin" && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleOpen()}
-          >
-            Create Episode
-          </Button>
-        )}
+
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => handleOpen()}
+        >
+          Create Episode
+        </Button>
       </Box>
       <Box
         sx={{
@@ -208,22 +207,19 @@ export function EpisodeListView() {
             <CardContent>
               <Typography variant="h6">{item.title}</Typography>
               <Typography>Episode {item.episode_number}</Typography>
-              {user?.role === "admin" && (
-                <Box
-                  sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}
+
+              <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
+                <Button size="small" onClick={() => handleOpen(item)}>
+                  Edit
+                </Button>
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() => handleDelete(item.id)}
                 >
-                  <Button size="small" onClick={() => handleOpen(item)}>
-                    Edit
-                  </Button>
-                  <Button
-                    size="small"
-                    color="error"
-                    onClick={() => handleDelete(item.id)}
-                  >
-                    Delete
-                  </Button>
-                </Box>
-              )}
+                  Delete
+                </Button>
+              </Box>
             </CardContent>
           </Card>
         ))}
@@ -254,12 +250,9 @@ export function EpisodeListView() {
             onChange={handleChange}
           />
           <Typography sx={{ mt: 2 }}>Episode Video</Typography>
-          {uploadStatus === 'error' && <p>Error loading uploader</p>}
-          {uploadStatus === 'ready' && uploadUrl ? (
-            <MuxUploader
-                endpoint={uploadUrl}
-                onSuccess={startPolling}
-            />
+          {uploadStatus === "error" && <p>Error loading uploader</p>}
+          {uploadStatus === "ready" && uploadUrl ? (
+            <MuxUploader endpoint={uploadUrl} onSuccess={startPolling} />
           ) : (
             <p>Loading uploader...</p>
           )}

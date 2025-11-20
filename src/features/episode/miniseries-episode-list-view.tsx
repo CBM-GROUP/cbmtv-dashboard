@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 
-
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
@@ -45,13 +44,13 @@ export function MiniseriesEpisodeListView({
 
   const handleChangePage = (
     event: React.MouseEvent<HTMLButtonElement> | null,
-    newPage: number,
+    newPage: number
   ) => {
     setPage(newPage);
   };
 
   const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
@@ -60,7 +59,9 @@ export function MiniseriesEpisodeListView({
   const fetchEpisodes = useCallback(async () => {
     if (!contentId) return;
     try {
-      const data = await miniseriesEpisodeService.getMiniseriesEpisodes(contentId);
+      const data = await miniseriesEpisodeService.getMiniseriesEpisodes(
+        contentId
+      );
       setEpisodes(data);
     } catch (error) {
       console.error("Failed to fetch episodes", error);
@@ -105,15 +106,14 @@ export function MiniseriesEpisodeListView({
         }}
       >
         <Typography variant="h4">Miniseries Episodes</Typography>
-        {user?.role === "admin" && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleOpen()}
-          >
-            Create Episode
-          </Button>
-        )}
+
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => handleOpen()}
+        >
+          Create Episode
+        </Button>
       </Box>
 
       <TableContainer component={Card}>
@@ -128,29 +128,36 @@ export function MiniseriesEpisodeListView({
             </TableRow>
           </TableHead>
           <TableBody>
-            {episodes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-            .map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>
-                  <Image src={item.thumbnail} alt={item.title} width={80} height={45} style={{ borderRadius: 4, objectFit: 'cover' }} />
-                </TableCell>
-                <TableCell>{item.title}</TableCell>
-                <TableCell>{item.miniseries_no}</TableCell>
-                <TableCell>{formatDuration(item.duration)}</TableCell>
-                <TableCell>
-                  <Button size="small" onClick={() => handleOpen(item)}>
-                    Edit
-                  </Button>
-                  <Button
-                    size="small"
-                    color="error"
-                    onClick={() => handleDelete(item.id)}
-                  >
-                    Delete
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {episodes
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <Image
+                      src={item.thumbnail}
+                      alt={item.title}
+                      width={80}
+                      height={45}
+                      style={{ borderRadius: 4, objectFit: "cover" }}
+                    />
+                  </TableCell>
+                  <TableCell>{item.title}</TableCell>
+                  <TableCell>{item.miniseries_no}</TableCell>
+                  <TableCell>{formatDuration(item.duration)}</TableCell>
+                  <TableCell>
+                    <Button size="small" onClick={() => handleOpen(item)}>
+                      Edit
+                    </Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => handleDelete(item.id)}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
         <TablePagination
