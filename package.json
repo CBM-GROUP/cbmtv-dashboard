@@ -10,6 +10,9 @@
     "format": "prettier --write .",
     "lint:fix": "eslint --fix ."
   },
+    "engines": {
+    "node": ">=20.9.0"
+  },
   "packages": {
     "": {
       "name": "@minimal/material-kit-react",
