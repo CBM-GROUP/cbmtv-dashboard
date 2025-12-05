@@ -1,36 +1,36 @@
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import dayjs from "dayjs";
+import duration from "dayjs/plugin/duration";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Card from '@mui/material/Card';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-import Tab from '@mui/material/Tab';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TablePagination from '@mui/material/TablePagination';
-import TableRow from '@mui/material/TableRow';
-import Tabs from '@mui/material/Tabs';
-import TextField from '@mui/material/TextField';
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
+import Tab from "@mui/material/Tab";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TablePagination from "@mui/material/TablePagination";
+import TableRow from "@mui/material/TableRow";
+import Tabs from "@mui/material/Tabs";
+import TextField from "@mui/material/TextField";
 
-import { ContentForm } from './content-form';
+import { ContentForm } from "./content-form";
 
-import { channelService } from 'src/services/channelService';
-import { contentService } from 'src/services/contentService';
+import { channelService } from "src/services/channelService";
+import { contentService } from "src/services/contentService";
 
-import { useAuth } from 'src/features/auth/context';
+import { useAuth } from "src/features/auth/context";
 
-import { Channel, Content } from '@/types';
+import { Channel, Content } from "@/types";
 
 dayjs.extend(duration);
 
@@ -38,7 +38,7 @@ export function ContentListView() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const channelId = searchParams.get('channel');
+  const channelId = searchParams.get("channel");
 
   const { user } = useAuth()!;
   const [content, setContent] = useState<Content[]>([]);
@@ -46,12 +46,15 @@ export function ContentListView() {
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Content | null>(null);
 
-  const [tab, setTab] = useState('movies');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [tab, setTab] = useState("movies");
+  const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
-  const handleChangePage = (event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
+  const handleChangePage = (
+    event: React.MouseEvent<HTMLButtonElement> | null,
+    newPage: number,
+  ) => {
     setPage(newPage);
   };
 
@@ -67,7 +70,7 @@ export function ContentListView() {
       const data = await contentService.getContent();
       setContent(data);
     } catch (error) {
-      console.error('Failed to fetch content', error);
+      console.error("Failed to fetch content", error);
     }
   };
 
@@ -76,7 +79,7 @@ export function ContentListView() {
       const data = await channelService.getChannels();
       setChannels(data);
     } catch (error) {
-      console.error('Failed to fetch channels', error);
+      console.error("Failed to fetch channels", error);
     }
   };
 
@@ -104,7 +107,7 @@ export function ContentListView() {
       await contentService.deleteContent(id);
       fetchContent();
     } catch (error) {
-      console.error('Failed to delete content', error);
+      console.error("Failed to delete content", error);
     }
   };
 
@@ -116,24 +119,24 @@ export function ContentListView() {
     <Box sx={{ p: 3 }}>
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           mb: 3,
         }}
       >
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
           <FormControl sx={{ minWidth: 240 }}>
             <InputLabel>Channel</InputLabel>
             <Select
-              value={channelId || ''}
+              value={channelId || ""}
               onChange={(e) => {
                 const newChannelId = e.target.value;
                 const params = new URLSearchParams(searchParams);
                 if (newChannelId) {
-                  params.set('channel', newChannelId);
+                  params.set("channel", newChannelId);
                 } else {
-                  params.delete('channel');
+                  params.delete("channel");
                 }
                 router.push(`${pathname}?${params.toString()}`);
               }}
@@ -154,19 +157,25 @@ export function ContentListView() {
             sx={{ minWidth: 240 }}
           />
         </Box>
-        
-          <Button variant="contained" color="primary" onClick={() => handleOpen()}>
-            Create Content
-          </Button>
-       
+
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => handleOpen()}
+        >
+          Create Content
+        </Button>
       </Box>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs value={tab} onChange={handleTabChange}>
           <Tab label="Movies" value="movies" />
           <Tab label="Series" value="series" />
           <Tab label="Miniseries" value="miniseries" />
           <Tab label="Music" value="music" />
+          <Tab label="Animations" value="animations" />
+          <Tab label="Documentary" value="documentary" />
+          <Tab label="Original" value="original" />
         </Tabs>
       </Box>
 
@@ -185,14 +194,19 @@ export function ContentListView() {
           <TableBody>
             {content
               .filter((item) => {
-                if (tab === 'movies') return item.content_type === 'movie';
-                if (tab === 'series') return item.content_type === 'series';
-                if (tab === 'miniseries') return item.content_type === 'miniseries';
-                if (tab === 'music') return item.content_type === 'music';
+                if (tab === "movies") return item.content_type === "movie";
+                if (tab === "series") return item.content_type === "series";
+                if (tab === "miniseries")
+                  return item.content_type === "miniseries";
+                if (tab === "music") return item.content_type === "music";
                 return false;
               })
-              .filter((item) => (channelId ? String(item.channel) === channelId : true))
-              .filter((item) => item.title.toLowerCase().includes(searchQuery.toLowerCase()))
+              .filter((item) =>
+                channelId ? String(item.channel) === channelId : true,
+              )
+              .filter((item) =>
+                item.title.toLowerCase().includes(searchQuery.toLowerCase()),
+              )
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((item) => (
                 <TableRow key={item.id}>
@@ -202,28 +216,37 @@ export function ContentListView() {
                       alt={item.title}
                       width={80}
                       height={45}
-                      style={{ borderRadius: 4, objectFit: 'cover' }}
+                      style={{ borderRadius: 4, objectFit: "cover" }}
                     />
                   </TableCell>
                   <TableCell>{item.title}</TableCell>
                   <TableCell>{item.content_type}</TableCell>
                   <TableCell>
-                    {channels.find((c) => String(c.id) === String(item.channel))?.name || '—'}
+                    {channels.find((c) => String(c.id) === String(item.channel))
+                      ?.name || "—"}
                   </TableCell>
                   <TableCell>{item.status}</TableCell>
                   <TableCell>
                     <Button size="small" onClick={() => handleOpen(item)}>
                       Edit
                     </Button>
-                    <Button size="small" color="error" onClick={() => handleDelete(item.id)}>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => handleDelete(item.id)}
+                    >
                       Delete
                     </Button>
-                    {item.content_type === 'series' && (
-                      <Button size="small" component={Link} href={`/content/${item.id}/seasons`}>
+                    {item.content_type === "series" && (
+                      <Button
+                        size="small"
+                        component={Link}
+                        href={`/content/${item.id}/seasons`}
+                      >
                         Seasons
                       </Button>
                     )}
-                    {item.content_type === 'miniseries' && (
+                    {item.content_type === "miniseries" && (
                       <Button
                         size="small"
                         component={Link}

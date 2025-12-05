@@ -126,7 +126,7 @@ class AuthError extends Error {
         this.name = 'AuthError';
     }
 }
-const API_URL = ("TURBOPACK compile-time value", "https://web-production-03b3b.up.railway.app");
+const API_URL = ("TURBOPACK compile-time value", "https://api.cbmtv.online");
 const REFRESH_URL = '/api/accounts/token/refresh/';
 const unauthorizedEvent = new Event('unauthorized');
 const apiClient = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$axios$40$1$2e$13$2e$1$2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].create({
