@@ -6,7 +6,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Enable PNPM
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Copy dependency files
 COPY package.json pnpm-lock.yaml .npmrc* ./
@@ -45,7 +45,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 # Enable PNPM
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Copy built app from builder
 COPY --from=builder /app/package.json ./
