@@ -13,13 +13,6 @@
   "engines": {
     "node": ">=20.9.0"
   },
-  "onlyBuiltDependencies": [
-    "@prisma/client",
-    "@prisma/engines",
-    "prisma",
-    "sharp",
-    "unrs-resolver"
-  ],
   "packages": {
     "": {
       "name": "@minimal/material-kit-react",
