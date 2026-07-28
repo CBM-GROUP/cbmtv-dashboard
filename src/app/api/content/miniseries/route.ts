@@ -1,32 +1,6 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// In-memory store for episodes (replace with actual database)
-import { Episode } from "@/types";
-
-const episodes: (Episode & { content: number })[] = [
-  {
-    id: '1',
-    title: 'Episode 1: The Pilot',
-    miniseries_no: 1,
-    content: 13,
-    streaming_link: '',
-    duration: '0',
-    thumbnail: '',
-  },
-  {
-    id: '2',
-    title: 'Episode 2: The Rising Action',
-    miniseries_no: 2,
-    content: 13,
-    streaming_link: '',
-    duration: '0',
-    thumbnail: '',
-  },
-];
-
-let nextId = 3;
+import { prisma } from '@/lib/prisma/client';
 
 // GET handler to filter miniseries episodes
 export async function GET(request: NextRequest) {
@@ -37,9 +11,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Content ID is required' }, { status: 400 });
   }
 
-  const filteredEpisodes = episodes.filter(ep => ep.content === parseInt(contentId, 10));
+  try {
+    const dbEpisodes = await prisma.episode.findMany({
+      where: {
+        content: parseInt(contentId, 10),
+      },
+      orderBy: {
+        miniseries_no: 'asc',
+      },
+    });
 
-  return NextResponse.json(filteredEpisodes);
+    return NextResponse.json(dbEpisodes);
+  } catch (error) {
+    console.error('Failed to fetch episodes:', error);
+    return NextResponse.json({ error: 'Failed to fetch episodes' }, { status: 500 });
+  }
 }
 
 // POST handler to create a new miniseries episode
@@ -52,20 +38,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const newEpisode: Episode & { content: number } = {
-      id: String(nextId++),
-      title,
-      miniseries_no,
-      content,
-      streaming_link: streaming_link || '',
-      duration: duration || '0',
-      thumbnail: thumbnail || '',
-    };
-
-    episodes.push(newEpisode);
+    const newEpisode = await prisma.episode.create({
+      data: {
+        title,
+        miniseries_no: parseInt(miniseries_no, 10),
+        content: parseInt(content, 10),
+        streaming_link: streaming_link || '',
+        duration: duration || '0',
+        thumbnail: thumbnail || '',
+      },
+    });
 
     return NextResponse.json(newEpisode, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error('Failed to create episode:', error);
     return NextResponse.json({ error: 'Failed to create episode' }, { status: 500 });
   }
 }

@@ -1,32 +1,6 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// In-memory store for episodes (replace with actual database)
-// NOTE: This is a separate in-memory store for demonstration.
-// For a real application, this data should be in a shared database.
-import { Episode } from "@/types";
-
-const episodes: (Episode & { content: number })[] = [
-  {
-    id: '1',
-    title: 'Episode 1: The Pilot',
-    miniseries_no: 1,
-    content: 13,
-    streaming_link: '',
-    duration: '0',
-    thumbnail: '',
-  },
-  {
-    id: '2',
-    title: 'Episode 2: The Rising Action',
-    miniseries_no: 2,
-    content: 13,
-    streaming_link: '',
-    duration: '0',
-    thumbnail: '',
-  },
-];
+import { prisma } from '@/lib/prisma/client';
 
 // PATCH handler to update a miniseries episode
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -35,22 +9,38 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const body = await request.json();
     const { title, miniseries_no, streaming_link, duration, thumbnail } = body;
 
-    const episodeIndex = episodes.findIndex(ep => ep.id === id);
+    // Check if the episode exists
+    const existingEpisode = await prisma.episode.findUnique({
+      where: { id },
+    });
 
-    if (episodeIndex === -1) {
+    if (!existingEpisode) {
       return NextResponse.json({ error: 'Episode not found' }, { status: 404 });
     }
 
-    // Update specified fields
-    if (title) episodes[episodeIndex].title = title;
-    if (miniseries_no) episodes[episodeIndex].miniseries_no = miniseries_no;
-    if (streaming_link) episodes[episodeIndex].streaming_link = streaming_link;
-    if (duration) episodes[episodeIndex].duration = duration;
-    if (thumbnail) episodes[episodeIndex].thumbnail = thumbnail;
+    // Prepare updated fields
+    const data: {
+      title?: string;
+      miniseries_no?: number;
+      streaming_link?: string;
+      duration?: string;
+      thumbnail?: string;
+    } = {};
+    if (title !== undefined) data.title = title;
+    if (miniseries_no !== undefined) data.miniseries_no = parseInt(miniseries_no, 10);
+    if (streaming_link !== undefined) data.streaming_link = streaming_link;
+    if (duration !== undefined) data.duration = duration;
+    if (thumbnail !== undefined) data.thumbnail = thumbnail;
 
-    return NextResponse.json(episodes[episodeIndex]);
+    const updatedEpisode = await prisma.episode.update({
+      where: { id },
+      data,
+    });
 
-  } catch {
+    return NextResponse.json(updatedEpisode);
+
+  } catch (error) {
+    console.error('Failed to update episode:', error);
     return NextResponse.json({ error: 'Failed to update episode' }, { status: 500 });
   }
 }
@@ -59,17 +49,24 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const episodeIndex = episodes.findIndex(ep => ep.id === id);
 
-    if (episodeIndex === -1) {
+    // Check if the episode exists
+    const existingEpisode = await prisma.episode.findUnique({
+      where: { id },
+    });
+
+    if (!existingEpisode) {
       return NextResponse.json({ error: 'Episode not found' }, { status: 404 });
     }
 
-    episodes.splice(episodeIndex, 1);
+    await prisma.episode.delete({
+      where: { id },
+    });
 
     return new Response(null, { status: 204 }); // No Content
 
-  } catch {
+  } catch (error) {
+    console.error('Failed to delete episode:', error);
     return NextResponse.json({ error: 'Failed to delete episode' }, { status: 500 });
   }
 }

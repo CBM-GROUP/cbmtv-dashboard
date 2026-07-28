@@ -1,3 +1,0 @@
-module.exports=[42184,a=>{"use strict";a.s(["default",()=>e],42184);var b=a.i(11755),c=a.i(84391),d=a.i(81843),d=d;function e(){let a=async()=>{let a=await c.default.get("/api/content/search");alert(a?.data?.message)};return(0,b.jsx)("section",{className:"px-6 lg:px-10",children:(0,b.jsx)(d.default,{variant:"contained",color:"primary",onClick:()=>a(),children:"Sync Search Data"})})}}];
-
-//# sourceMappingURL=src_app_%28dashboard%29_page_tsx_20a39ae7._.js.map

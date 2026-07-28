@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///home/techmessiah/Work/Projects/websites/CBMTV/cbmtv-dashboard-nextjs/src/app/not-found.tsx"],"sourcesContent":["\"use client\";\n\n// import { Page404 } from '@/features/error/page-not-found';\n\nexport default function NotFound() {\n  return <h1>Not Found</h1>;\n}\n"],"names":[],"mappings":";;;;;AAAA;;AAIe,SAAS;IACtB,qBAAO,6WAAC;kBAAG;;;;;;AACb","debugId":null}}]
-}

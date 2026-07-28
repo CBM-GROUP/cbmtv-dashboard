@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cbmtv-db
+    restart: always
+    environment:
+      POSTGRES_USER: cbmtv_user
+      POSTGRES_PASSWORD: cbmtv_secure_password
+      POSTGRES_DB: cbmtv_database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_MEILISEARCH_URL=${NEXT_PUBLIC_MEILISEARCH_URL}
+        - NEXT_PUBLIC_MEILISEARCH_API_KEY=${NEXT_PUBLIC_MEILISEARCH_API_KEY}
+        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+        - MUX_TOKEN_ID=${MUX_TOKEN_ID}
+        - MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
+    container_name: cbmtv-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://cbmtv_user:cbmtv_secure_password@db:5432/cbmtv_database?schema=public
+      - NEXT_PUBLIC_MEILISEARCH_URL=${NEXT_PUBLIC_MEILISEARCH_URL}
+      - NEXT_PUBLIC_MEILISEARCH_API_KEY=${NEXT_PUBLIC_MEILISEARCH_API_KEY}
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - MUX_TOKEN_ID=${MUX_TOKEN_ID}
+      - MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

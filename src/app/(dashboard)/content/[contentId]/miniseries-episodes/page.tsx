@@ -1,17 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { use } from "react";
 import { MiniseriesEpisodeListView } from "src/features/episode/miniseries-episode-list-view";
 
 interface MiniseriesEpisodesPageProps {
-  params: {
+  params: Promise<{
     contentId: string;
-  };
+  }>;
 }
 
 export default function MiniseriesEpisodesPage({
   params,
 }: MiniseriesEpisodesPageProps) {
-  const { contentId } = params;
+  const { contentId } = use(params);
   return <MiniseriesEpisodeListView contentId={contentId} />;
 }

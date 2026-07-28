@@ -1,5 +1,1 @@
-var R=require("../chunks/ssr/[turbopack]_runtime.js")("server/pages/_document.js")
-R.c("server/chunks/ssr/[root-of-the-server]__b6569061._.js")
-R.c("server/chunks/ssr/[root-of-the-server]__02d47124._.js")
-R.m(57470)
-module.exports=R.m(57470).exports
+"use strict";(()=>{var a={};a.id=839,a.ids=[839],a.modules={8732:a=>{a.exports=require("react/jsx-runtime")},33873:a=>{a.exports=require("path")},40361:a=>{a.exports=require("next/dist/compiled/next-server/pages.runtime.prod.js")},82015:a=>{a.exports=require("react")}};var b=require("../webpack-runtime.js");b.C(a);var c=b.X(0,[43],()=>b(b.s=7043));module.exports=c})();
