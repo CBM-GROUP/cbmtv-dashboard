@@ -27,8 +27,6 @@ services:
         - MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
     container_name: cbmtv-app
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://cbmtv_user:cbmtv_secure_password@db:5432/cbmtv_database?schema=public
       - NEXT_PUBLIC_MEILISEARCH_URL=${NEXT_PUBLIC_MEILISEARCH_URL}
@@ -39,6 +37,18 @@ services:
       - MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
     depends_on:
       - db
+
+  nginx:
+    image: nginx:alpine
+    container_name: cbmtv-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
 
 volumes:
   postgres_data:
