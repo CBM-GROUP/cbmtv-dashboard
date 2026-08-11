@@ -65,5 +65,9 @@ ENV MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
 # Expose port
 EXPOSE 3000
 
-# Start Next.js server
-CMD ["pnpm", "start"]
+# Copy the startup script
+COPY start.sh ./
+RUN chmod +x start.sh
+
+# Start using the automated script
+CMD ["./start.sh"]
