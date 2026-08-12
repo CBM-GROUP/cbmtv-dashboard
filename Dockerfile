@@ -1,7 +1,7 @@
 ##############################
 # 1. Build Stage
 ##############################
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,6 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Copy dependency files
 COPY package.json pnpm-lock.yaml .npmrc* ./
-COPY prisma ./prisma/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -40,7 +39,7 @@ RUN pnpm run build
 ##############################
 # 2. Production Stage
 ##############################
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
 
@@ -53,7 +52,6 @@ COPY --from=builder /app/pnpm-lock.yaml ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
 
 # Runtime environment variables (Dokploy will inject actual values)
 ENV NEXT_PUBLIC_MEILISEARCH_URL=${NEXT_PUBLIC_MEILISEARCH_URL}
@@ -66,9 +64,9 @@ ENV MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
 # Expose port
 EXPOSE 3000
 
-# Copy the startup script
+# Copy the startup script and set permissions; ensure non-root ownership
 COPY start.sh ./
-RUN chmod +x start.sh
-
+RUN chmod +x start.sh && chown -R node:node /app || true
+USER node
 # Start using the automated script
 CMD ["./start.sh"]
