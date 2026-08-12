@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma/client';
+import apiClient from '@/services/api';
 
 // PATCH handler to update a miniseries episode
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -10,11 +10,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const { title, miniseries_no, streaming_link, duration, thumbnail } = body;
 
     // Check if the episode exists
-    const existingEpisode = await prisma.episode.findUnique({
-      where: { id },
-    });
-
-    if (!existingEpisode) {
+    const check = await apiClient.get(`/api/content/miniseries/${id}/`);
+    if (check.status === 404) {
       return NextResponse.json({ error: 'Episode not found' }, { status: 404 });
     }
 
@@ -27,17 +24,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       thumbnail?: string;
     } = {};
     if (title !== undefined) data.title = title;
-    if (miniseries_no !== undefined) data.miniseries_no = parseInt(miniseries_no, 10);
+    if (miniseries_no !== undefined) data.miniseries_no = Number.parseInt(miniseries_no, 10);
     if (streaming_link !== undefined) data.streaming_link = streaming_link;
     if (duration !== undefined) data.duration = duration;
     if (thumbnail !== undefined) data.thumbnail = thumbnail;
 
-    const updatedEpisode = await prisma.episode.update({
-      where: { id },
-      data,
-    });
-
-    return NextResponse.json(updatedEpisode);
+    const response = await apiClient.patch(`/api/content/miniseries/${id}/`, data);
+    return NextResponse.json(response.data);
 
   } catch (error) {
     console.error('Failed to update episode:', error);
@@ -51,19 +44,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     const { id } = await context.params;
 
     // Check if the episode exists
-    const existingEpisode = await prisma.episode.findUnique({
-      where: { id },
-    });
-
-    if (!existingEpisode) {
-      return NextResponse.json({ error: 'Episode not found' }, { status: 404 });
-    }
-
-    await prisma.episode.delete({
-      where: { id },
-    });
-
-    return new Response(null, { status: 204 }); // No Content
+    await apiClient.delete(`/api/content/miniseries/${id}/`);
+    return new Response(null, { status: 204 });
 
   } catch (error) {
     console.error('Failed to delete episode:', error);

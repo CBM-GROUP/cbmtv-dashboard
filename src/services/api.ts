@@ -74,11 +74,11 @@ apiClient.interceptors.response.use(
 
         document.dispatchEvent(unauthorizedEvent);
 
-        return Promise.reject(refreshError);
+        throw refreshError;
       }
     }
 
-    return Promise.reject(error);
+    throw error;
   },
 );
 

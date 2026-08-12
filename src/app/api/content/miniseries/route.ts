@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma/client';
+import apiClient from '@/services/api';
 
 // GET handler to filter miniseries episodes
 export async function GET(request: NextRequest) {
@@ -12,16 +12,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const dbEpisodes = await prisma.episode.findMany({
-      where: {
-        content: parseInt(contentId, 10),
-      },
-      orderBy: {
-        miniseries_no: 'asc',
-      },
-    });
-
-    return NextResponse.json(dbEpisodes);
+    const response = await apiClient.get(`/api/content/miniseries/?content=${contentId}`);
+    return NextResponse.json(response.data);
   } catch (error) {
     console.error('Failed to fetch episodes:', error);
     return NextResponse.json({ error: 'Failed to fetch episodes' }, { status: 500 });
@@ -38,18 +30,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const newEpisode = await prisma.episode.create({
-      data: {
-        title,
-        miniseries_no: parseInt(miniseries_no, 10),
-        content: parseInt(content, 10),
-        streaming_link: streaming_link || '',
-        duration: duration || '0',
-        thumbnail: thumbnail || '',
-      },
+    const response = await apiClient.post('/api/content/miniseries/', {
+      title,
+      miniseries_no: Number.parseInt(miniseries_no, 10),
+      content: Number.parseInt(content, 10),
+      streaming_link: streaming_link || '',
+      duration: duration || '0',
+      thumbnail: thumbnail || '',
     });
 
-    return NextResponse.json(newEpisode, { status: 201 });
+    return NextResponse.json(response.data, { status: 201 });
   } catch (error) {
     console.error('Failed to create episode:', error);
     return NextResponse.json({ error: 'Failed to create episode' }, { status: 500 });
