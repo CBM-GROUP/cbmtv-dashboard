@@ -7,7 +7,7 @@ export class AuthError extends Error {
   }
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
 const REFRESH_URL = '/api/accounts/token/refresh/';
 
 export const unauthorizedEvent = new Event('unauthorized');
