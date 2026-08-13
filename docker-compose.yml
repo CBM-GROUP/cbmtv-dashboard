@@ -4,6 +4,8 @@ services:
   db:
     image: postgres:16-alpine
     container_name: cbmtv-db
+    profiles:
+      - dev
     restart: always
     environment:
       POSTGRES_USER: cbmtv_user
@@ -15,19 +17,12 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_MEILISEARCH_URL=${NEXT_PUBLIC_MEILISEARCH_URL}
-        - NEXT_PUBLIC_MEILISEARCH_API_KEY=${NEXT_PUBLIC_MEILISEARCH_API_KEY}
-        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-        - MUX_TOKEN_ID=${MUX_TOKEN_ID}
-        - MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
+    image: ${CBMTV_APP_IMAGE:-cbmtv-app:latest}
     container_name: cbmtv-app
     restart: always
     environment:
+      # Prevent any database seeding or migration at container startup
+      - SKIP_DB_SEED=true
       - DATABASE_URL=postgresql://cbmtv_user:cbmtv_secure_password@db:5432/cbmtv_database?schema=public
       - NEXT_PUBLIC_MEILISEARCH_URL=${NEXT_PUBLIC_MEILISEARCH_URL}
       - NEXT_PUBLIC_MEILISEARCH_API_KEY=${NEXT_PUBLIC_MEILISEARCH_API_KEY}
@@ -35,8 +30,6 @@ services:
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
       - MUX_TOKEN_ID=${MUX_TOKEN_ID}
       - MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}
-    depends_on:
-      - db
 
   nginx:
     image: nginx:alpine
@@ -54,3 +47,4 @@ services:
 
 volumes:
   postgres_data:
+    external: true

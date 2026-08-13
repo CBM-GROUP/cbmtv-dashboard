@@ -1,0 +1,25 @@
+# Ignore local docker and infra files
+Dockerfile
+docker-compose.yml
+nginx/
+prisma/
+
+# Ignore local env files
+.env
+.env.*
+.env.local
+
+# Editor and OS
+.vscode/
+.DS_Store
+
+# Node artifacts
+node_modules/
+.pnpm-store/
+
+# CI / local scripts
+start.sh
+
+# Don't upload large assets
+public/assets/background/
+public/assets/images/
