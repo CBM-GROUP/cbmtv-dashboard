@@ -1,7 +1,4 @@
 import { NextResponse } from 'next/server';
-import apiClient from '@/services/api';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_me_in_production';
 
 export async function POST(request: Request) {
   try {
@@ -12,18 +9,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    // Proxy login to central backend
-    const response = await apiClient.post('/api/accounts/login/', { email, password });
-    const data = response.data;
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-    // Expect backend to return access/refresh tokens and user
-    if (!data?.access) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    if (!apiBaseUrl) {
+      return NextResponse.json({ error: 'Backend API is not configured' }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    const response = await fetch(new URL('/api/accounts/login/', apiBaseUrl), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+      cache: 'no-store',
+    });
+
+    const responseBody = await response.text();
+    const contentType = response.headers.get('content-type');
+
+    return new NextResponse(responseBody, {
+      status: response.status,
+      headers: contentType ? { 'Content-Type': contentType } : undefined,
+    });
   } catch (error) {
     console.error('Login error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to reach backend API' }, { status: 502 });
   }
 }
