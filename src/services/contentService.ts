@@ -1,10 +1,11 @@
 import apiClient from "./api";
 import { Content } from "@/types";
+import { normalizeListResponse } from "./normalizeListResponse";
 
 export const contentService = {
   async getContent(): Promise<Content[]> {
     const response = await apiClient.get("/api/content/");
-    return response.data;
+    return normalizeListResponse<Content>(response.data);
   },
 
   async createContent(data: Omit<Content, 'id'>) {
