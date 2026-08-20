@@ -187,6 +187,7 @@ export function EpisodeListView() {
           <VideoUploader
             label="Episode Video"
             status={uploader.status}
+            progress={uploader.progress}
             error={uploader.error}
             finalUrl={formData.file_url}
             onUpload={uploader.uploadFile}

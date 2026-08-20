@@ -7,7 +7,9 @@ export class AuthError extends Error {
   }
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
+const configuredApiUrl =
+  process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_URL = configuredApiUrl?.replace(/\/+$/, '');
 const REFRESH_URL = '/api/accounts/token/refresh/';
 
 export const unauthorizedEvent = new Event('unauthorized');
@@ -33,6 +35,10 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
+        if (!API_URL) {
+          throw new AuthError('Backend API is not configured');
+        }
+
         const refreshToken = localStorage.getItem('refresh_token');
 
         if (!refreshToken) {

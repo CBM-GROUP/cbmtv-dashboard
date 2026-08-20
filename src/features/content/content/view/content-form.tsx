@@ -11,6 +11,7 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControl from "@mui/material/FormControl";
+import FormHelperText from "@mui/material/FormHelperText";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
@@ -53,11 +54,13 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     duration: "",
   });
   const [duration, setDuration] = useState({ hours: 0, minutes: 0 });
+  const [formError, setFormError] = useState("");
 
   const trailerUploader = useMediaUpload("video");
   const streamUploader = useMediaUpload("video");
 
   useEffect(() => {
+    setFormError("");
     if (editItem) {
       setFormData(editItem);
       if (editItem.duration) {
@@ -109,6 +112,9 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
       | ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>
       | SelectChangeEvent,
   ) => {
+    if (e.target.name === "channel") {
+      setFormError("");
+    }
     setFormData({
       ...formData,
       [e.target.name as string]: e.target.value,
@@ -116,6 +122,11 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   };
 
   const handleSubmit = async () => {
+    if (Number(formData.channel) <= 0) {
+      setFormError("Select a channel before saving content.");
+      return;
+    }
+
     try {
       const data = {
         ...formData,
@@ -168,7 +179,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
             <MenuItem value="original">Original</MenuItem>
           </Select>
         </FormControl>
-        <FormControl fullWidth margin="dense">
+        <FormControl fullWidth margin="dense" error={Boolean(formError)}>
           <InputLabel>Channel</InputLabel>
           <Select
             name="channel"
@@ -181,6 +192,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
               </MenuItem>
             ))}
           </Select>
+          {formError && <FormHelperText>{formError}</FormHelperText>}
         </FormControl>
         <TextField
           margin="dense"
@@ -194,6 +206,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
         <VideoUploader
           label="Trailer Video"
           status={trailerUploader.status}
+          progress={trailerUploader.progress}
           error={trailerUploader.error}
           finalUrl={formData.trailer_link}
           onUpload={trailerUploader.uploadFile}
@@ -201,6 +214,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
         <VideoUploader
           label="Streaming Video"
           status={streamUploader.status}
+          progress={streamUploader.progress}
           error={streamUploader.error}
           finalUrl={formData.streaming_link}
           onUpload={streamUploader.uploadFile}
@@ -281,7 +295,9 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSubmit}>Save</Button>
+        <Button onClick={handleSubmit} disabled={Number(formData.channel) <= 0}>
+          Save
+        </Button>
       </DialogActions>
     </Dialog>
   );

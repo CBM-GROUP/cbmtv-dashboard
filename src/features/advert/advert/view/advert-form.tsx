@@ -130,6 +130,7 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
         <VideoUploader
           label="Advert Video"
           status={uploader.status}
+          progress={uploader.progress}
           error={uploader.error}
           finalUrl={formData.stream_link}
           onUpload={uploader.uploadFile}

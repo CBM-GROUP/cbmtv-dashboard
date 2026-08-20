@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { useEffect, useState } from 'react';
-import { BiLoader, BiUpload } from 'react-icons/bi';
+import { BiUpload } from 'react-icons/bi';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Image from 'next/image';
@@ -56,7 +56,7 @@ export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
             className="w-full h-full absolute top-0 left-0 z-10 opacity-0 cursor-pointer"
           />
           <div className="w-full h-full flex items-center justify-center bg-gray-200 border-0">
-            {uploader.status === 'uploading' ? <BiLoader /> : <BiUpload />}
+            {uploader.status === 'uploading' ? `${uploader.progress}%` : <BiUpload />}
           </div>
         </div>
 

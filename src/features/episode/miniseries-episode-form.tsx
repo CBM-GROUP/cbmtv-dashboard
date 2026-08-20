@@ -114,6 +114,7 @@ export function MiniseriesEpisodeForm({ open, onClose, item: editItem, contentId
         <VideoUploader
           label="Streaming Video"
           status={uploader.status}
+          progress={uploader.progress}
           error={uploader.error}
           finalUrl={formData.streaming_link}
           onUpload={uploader.uploadFile}
