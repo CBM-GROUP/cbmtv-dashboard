@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/storage/images/**',
       },
+      ...(process.env.CLOUDFRONT_BASE_URL
+        ? [{
+            protocol: new URL(process.env.CLOUDFRONT_BASE_URL).protocol.replace(':', '') as 'http' | 'https',
+            hostname: new URL(process.env.CLOUDFRONT_BASE_URL).hostname,
+            pathname: '/cbm-images/**',
+          }]
+        : []),
     ],
   },
 };

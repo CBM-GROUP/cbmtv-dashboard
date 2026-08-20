@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
-import { useMuxUpload } from "@/hooks/use-mux-upload";
+import { useMediaUpload } from "@/hooks/use-media-upload";
 import { VideoUploader } from "@/components/video-uploader";
 import { ImageUploader } from "@/components/image-uploader";
 import Button from "@mui/material/Button";
@@ -37,7 +37,7 @@ export function MiniseriesEpisodeForm({ open, onClose, item: editItem, contentId
     thumbnail: "",
   });
 
-  const uploader = useMuxUpload();
+  const uploader = useMediaUpload("video");
 
   useEffect(() => {
     if (editItem) {
@@ -113,11 +113,10 @@ export function MiniseriesEpisodeForm({ open, onClose, item: editItem, contentId
         />
         <VideoUploader
           label="Streaming Video"
-          uploadUrl={uploader.uploadUrl}
           status={uploader.status}
-          isPolling={uploader.isPolling}
+          error={uploader.error}
           finalUrl={formData.streaming_link}
-          onSuccess={uploader.startPolling}
+          onUpload={uploader.uploadFile}
         />
         <ImageUploader
           label="Thumbnail URL"

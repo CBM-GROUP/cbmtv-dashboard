@@ -1,26 +1,31 @@
-import MuxUploader from "@mux/mux-uploader-react";
+import type { ChangeEvent } from "react";
+import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 
 interface VideoUploaderProps {
   label: string;
-  uploadUrl: string;
   status: string;
-  isPolling: boolean;
+  error: string;
   finalUrl: string;
-  onSuccess: () => void;
+  onUpload: (file: File) => Promise<string>;
 }
 
-export function VideoUploader({ label, uploadUrl, status, isPolling, finalUrl, onSuccess }: VideoUploaderProps) {
+export function VideoUploader({ label, status, error, finalUrl, onUpload }: VideoUploaderProps) {
+  const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) await onUpload(file).catch(() => undefined);
+    event.target.value = "";
+  };
+
   return (
     <>
       <Typography sx={{ mt: 2 }}>{label}</Typography>
-      {status === "error" && <p>Error loading uploader.</p>}
-      {status === "fetching" && <p>Loading uploader...</p>}
-      {status === "ready" && uploadUrl ? (
-        <MuxUploader endpoint={uploadUrl} onSuccess={onSuccess} />
-      ) : null}
-      {isPolling && <p>Processing video...</p>}
+      <Button component="label" variant="outlined" disabled={status === "uploading"} sx={{ my: 1 }}>
+        {status === "uploading" ? "Uploading..." : `Select ${label}`}
+        <input hidden type="file" accept="video/mp4,video/x-m4v,video/quicktime,video/webm" onChange={handleChange} />
+      </Button>
+      {status === "error" && <p role="alert">{error}</p>}
       <TextField
         margin="dense"
         label={`${label} URL`}

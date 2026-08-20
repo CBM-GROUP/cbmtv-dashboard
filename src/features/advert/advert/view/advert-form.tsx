@@ -4,7 +4,7 @@ import { SelectChangeEvent } from "@mui/material/Select";
 
 import { advertService } from "src/services/advertService";
 
-import { useMuxUpload } from "@/hooks/use-mux-upload";
+import { useMediaUpload } from "@/hooks/use-media-upload";
 import { VideoUploader } from "@/components/video-uploader";
 import { ImageUploader } from "@/components/image-uploader";
 import Button from "@mui/material/Button";
@@ -37,7 +37,7 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
     advert_thumbnail: "",
   });
 
-  const uploader = useMuxUpload();
+  const uploader = useMediaUpload("video");
 
   useEffect(() => {
     if (editItem) {
@@ -129,11 +129,10 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
 
         <VideoUploader
           label="Advert Video"
-          uploadUrl={uploader.uploadUrl}
           status={uploader.status}
-          isPolling={uploader.isPolling}
+          error={uploader.error}
           finalUrl={formData.stream_link}
-          onSuccess={uploader.startPolling}
+          onUpload={uploader.uploadFile}
         />
 
         <ImageUploader

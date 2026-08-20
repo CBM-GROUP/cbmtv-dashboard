@@ -20,7 +20,7 @@ import Typography from "@mui/material/Typography";
 import { contentService } from "src/services/contentService";
 
 import { ImageUploader } from "@/components/image-uploader";
-import { useMuxUpload } from "@/hooks/use-mux-upload";
+import { useMediaUpload } from "@/hooks/use-media-upload";
 import { VideoUploader } from "@/components/video-uploader";
 
 import { Content, Channel } from "@/types";
@@ -54,8 +54,8 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   });
   const [duration, setDuration] = useState({ hours: 0, minutes: 0 });
 
-  const trailerUploader = useMuxUpload();
-  const streamUploader = useMuxUpload();
+  const trailerUploader = useMediaUpload("video");
+  const streamUploader = useMediaUpload("video");
 
   useEffect(() => {
     if (editItem) {
@@ -193,19 +193,17 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
         />
         <VideoUploader
           label="Trailer Video"
-          uploadUrl={trailerUploader.uploadUrl}
           status={trailerUploader.status}
-          isPolling={trailerUploader.isPolling}
+          error={trailerUploader.error}
           finalUrl={formData.trailer_link}
-          onSuccess={trailerUploader.startPolling}
+          onUpload={trailerUploader.uploadFile}
         />
         <VideoUploader
           label="Streaming Video"
-          uploadUrl={streamUploader.uploadUrl}
           status={streamUploader.status}
-          isPolling={streamUploader.isPolling}
+          error={streamUploader.error}
           finalUrl={formData.streaming_link}
-          onSuccess={streamUploader.startPolling}
+          onUpload={streamUploader.uploadFile}
         />
         <ImageUploader
           label="Thumbnail URL"

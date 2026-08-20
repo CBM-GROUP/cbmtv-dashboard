@@ -1,7 +1,6 @@
 import type { ChangeEvent } from "react";
 
-import { useState, useEffect, useRef } from "react";
-import MuxUploader from "@mux/mux-uploader-react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 
 import Box from "@mui/material/Box";
@@ -18,6 +17,8 @@ import DialogActions from "@mui/material/DialogActions";
 import apiClient from "src/services/api";
 
 import { useAuth } from "src/features/auth/context";
+import { useMediaUpload } from "@/hooks/use-media-upload";
+import { VideoUploader } from "@/components/video-uploader";
 
 interface Episode {
   id: string;
@@ -38,78 +39,13 @@ export function EpisodeListView() {
     file_url: "",
   });
 
-  // Mux Uploader State
-  const [uploadUrl, setUploadUrl] = useState("");
-  const [uploadId, setUploadId] = useState("");
-  const [uploadStatus, setUploadStatus] = useState("initializing");
-  const [isPolling, setIsPolling] = useState(false);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const uploader = useMediaUpload("video");
 
   useEffect(() => {
-    async function getUploadUrl() {
-      try {
-        setUploadStatus("fetching");
-        const res = await fetch("/api/create-upload", { method: "POST" });
-        const data = await res.json();
-        if (data.data?.url) {
-          setUploadUrl(data.data.url);
-          setUploadId(data.data.id);
-          setUploadStatus("ready");
-        } else {
-          setUploadStatus("error");
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (error) {
-        setUploadStatus("error");
-      }
+    if (uploader.finalUrl) {
+      setFormData((previous) => ({ ...previous, file_url: uploader.finalUrl }));
     }
-    if (open) {
-      getUploadUrl();
-    }
-  }, [open]);
-
-  const getAssetDetails = async (assetId: string) => {
-    try {
-      const res = await fetch(`/api/asset-details?assetId=${assetId}`);
-      const data = await res.json();
-      if (data.data?.playback_ids?.[0]?.id) {
-        const playbackId = data.data.playback_ids[0].id;
-        const playbackUrl = `https://stream.mux.com/${playbackId}.m3u8`;
-        setFormData((prev) => ({ ...prev, file_url: playbackUrl }));
-      }
-    } catch (error) {
-      console.error("Failed to get asset details:", error);
-    }
-  };
-
-  const checkUploadStatus = async () => {
-    if (!uploadId) return;
-    try {
-      const res = await fetch(`/api/upload-status?uploadId=${uploadId}`);
-      const data = await res.json();
-      if (data.data?.status === "asset_created" && data.data?.asset_id) {
-        await getAssetDetails(data.data.asset_id);
-        stopPolling();
-      } else if (data.data?.status === "errored") {
-        stopPolling();
-      }
-    } catch (error) {
-      console.error("Failed to check upload status:", error);
-      stopPolling();
-    }
-  };
-
-  const startPolling = () => {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    setIsPolling(true);
-    pollingRef.current = setInterval(checkUploadStatus, 3000);
-    setTimeout(stopPolling, 300000); // 5 minutes timeout
-  };
-
-  const stopPolling = () => {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    setIsPolling(false);
-  };
+  }, [uploader.finalUrl]);
 
   const fetchEpisodes = async () => {
     try {
@@ -144,7 +80,6 @@ export function EpisodeListView() {
   const handleClose = () => {
     setOpen(false);
     setEditItem(null);
-    stopPolling();
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -249,23 +184,12 @@ export function EpisodeListView() {
             value={formData.episode_number || ""}
             onChange={handleChange}
           />
-          <Typography sx={{ mt: 2 }}>Episode Video</Typography>
-          {uploadStatus === "error" && <p>Error loading uploader</p>}
-          {uploadStatus === "ready" && uploadUrl ? (
-            <MuxUploader endpoint={uploadUrl} onSuccess={startPolling} />
-          ) : (
-            <p>Loading uploader...</p>
-          )}
-          {isPolling && <p>Processing...</p>}
-          <TextField
-            margin="dense"
-            name="file_url"
-            label="File URL"
-            type="text"
-            fullWidth
-            value={formData.file_url || ""}
-            onChange={handleChange}
-            disabled
+          <VideoUploader
+            label="Episode Video"
+            status={uploader.status}
+            error={uploader.error}
+            finalUrl={formData.file_url}
+            onUpload={uploader.uploadFile}
           />
         </DialogContent>
         <DialogActions>

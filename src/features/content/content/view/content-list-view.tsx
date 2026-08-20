@@ -22,6 +22,10 @@ import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import Tabs from "@mui/material/Tabs";
 import TextField from "@mui/material/TextField";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import MuxPlayer from "@mux/mux-player-react";
 
 import { ContentForm } from "./content-form";
 
@@ -45,6 +49,7 @@ export function ContentListView() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Content | null>(null);
+  const [playUrl, setPlayUrl] = useState("");
 
   const [tab, setTab] = useState("movies");
   const [searchQuery, setSearchQuery] = useState("");
@@ -230,6 +235,11 @@ export function ContentListView() {
                     <Button size="small" onClick={() => handleOpen(item)}>
                       Edit
                     </Button>
+                    {item.streaming_link && (
+                      <Button size="small" onClick={() => setPlayUrl(item.streaming_link)}>
+                        Play
+                      </Button>
+                    )}
                     <Button
                       size="small"
                       color="error"
@@ -278,6 +288,23 @@ export function ContentListView() {
         channels={channels}
         onSave={handleSave}
       />
+      <Dialog open={Boolean(playUrl)} onClose={() => setPlayUrl("")} fullWidth maxWidth="md">
+        <DialogTitle>Video playback</DialogTitle>
+        <DialogContent>
+          {playUrl.includes("mux.com") ? (
+            <MuxPlayer
+              playbackId={playUrl.split("/").pop()?.split(".")[0] || ""}
+              style={{ width: "100%", aspectRatio: "16/9" }}
+              autoPlay
+              controls
+            />
+          ) : (
+            <video key={playUrl} src={playUrl} controls autoPlay style={{ width: "100%" }}>
+              Your browser does not support video playback.
+            </video>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
