@@ -145,7 +145,7 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
         <Button onClick={onClose}>Cancel</Button>
         <Button
           onClick={handleSubmit}
-          disabled={uploader.isPolling || uploader.status === "fetching"}
+          disabled={uploader.status === "uploading"}
         >
           Save
         </Button>

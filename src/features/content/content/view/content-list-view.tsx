@@ -296,7 +296,6 @@ export function ContentListView() {
               playbackId={playUrl.split("/").pop()?.split(".")[0] || ""}
               style={{ width: "100%", aspectRatio: "16/9" }}
               autoPlay
-              controls
             />
           ) : (
             <video key={playUrl} src={playUrl} controls autoPlay style={{ width: "100%" }}>

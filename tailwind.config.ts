@@ -17,7 +17,7 @@ const config: Config = {
     },
   },
   plugins: [],
-  // @ts-ignore
+  // @ts-expect-error -- Tailwind v4's Config type omits the legacy corePlugins option.
   corePlugins: {
     preflight: false,
   },
