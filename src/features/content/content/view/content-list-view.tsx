@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
 import Box from "@mui/material/Box";
@@ -25,6 +25,8 @@ import TextField from "@mui/material/TextField";
 import Dialog from "@mui/material/Dialog";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import DialogActions from "@mui/material/DialogActions";
+import Alert from "@mui/material/Alert";
 import MuxPlayer from "@mux/mux-player-react";
 
 import { ContentForm } from "./content-form";
@@ -32,11 +34,59 @@ import { ContentForm } from "./content-form";
 import { channelService } from "src/services/channelService";
 import { contentService } from "src/services/contentService";
 
-import { useAuth } from "src/features/auth/context";
-
 import { Channel, Content } from "@/types";
 
 dayjs.extend(duration);
+
+function isPlayableUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function ContentThumbnail({ src, title }: { src: string; title: string }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (!isPlayableUrl(src) || failed) {
+    return (
+      <Box
+        aria-label={src ? `Thumbnail unavailable for ${title}` : `No thumbnail for ${title}`}
+        sx={{
+          width: 80,
+          height: 45,
+          borderRadius: 1,
+          bgcolor: "action.hover",
+          color: "text.secondary",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 11,
+          textAlign: "center",
+        }}
+      >
+        No image
+      </Box>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={`${title} thumbnail`}
+      width={80}
+      height={45}
+      onError={() => setFailed(true)}
+      style={{ width: 80, height: 45, borderRadius: 4, objectFit: "cover" }}
+    />
+  );
+}
 
 export function ContentListView() {
   const router = useRouter();
@@ -44,12 +94,13 @@ export function ContentListView() {
   const searchParams = useSearchParams();
   const channelId = searchParams.get("channel");
 
-  const { user } = useAuth()!;
   const [content, setContent] = useState<Content[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Content | null>(null);
-  const [playUrl, setPlayUrl] = useState("");
+  const [playingContent, setPlayingContent] = useState<Content | null>(null);
+  const [playbackError, setPlaybackError] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [tab, setTab] = useState("movies");
   const [searchQuery, setSearchQuery] = useState("");
@@ -118,6 +169,16 @@ export function ContentListView() {
 
   const handleSave = () => {
     fetchContent();
+  };
+
+  const handleClosePlayer = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.removeAttribute("src");
+      videoRef.current.load();
+    }
+    setPlayingContent(null);
+    setPlaybackError("");
   };
 
   return (
@@ -216,13 +277,7 @@ export function ContentListView() {
               .map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <Image
-                      src={item.thumbnail}
-                      alt={item.title}
-                      width={80}
-                      height={45}
-                      style={{ borderRadius: 4, objectFit: "cover" }}
-                    />
+                    <ContentThumbnail src={item.thumbnail} title={item.title} />
                   </TableCell>
                   <TableCell>{item.title}</TableCell>
                   <TableCell>{item.content_type}</TableCell>
@@ -232,39 +287,47 @@ export function ContentListView() {
                   </TableCell>
                   <TableCell>{item.status}</TableCell>
                   <TableCell>
-                    <Button size="small" onClick={() => handleOpen(item)}>
-                      Edit
-                    </Button>
-                    {item.streaming_link && (
-                      <Button size="small" onClick={() => setPlayUrl(item.streaming_link)}>
-                        Play
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      <Button size="small" onClick={() => handleOpen(item)}>
+                        Edit
                       </Button>
-                    )}
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      Delete
-                    </Button>
-                    {item.content_type === "series" && (
+                      {isPlayableUrl(item.streaming_link) && (
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            setPlaybackError("");
+                            setPlayingContent(item);
+                          }}
+                        >
+                          Play
+                        </Button>
+                      )}
                       <Button
                         size="small"
-                        component={Link}
-                        href={`/content/${item.id}/seasons`}
+                        color="error"
+                        onClick={() => handleDelete(item.id)}
                       >
-                        Seasons
+                        Delete
                       </Button>
-                    )}
-                    {item.content_type === "miniseries" && (
-                      <Button
-                        size="small"
-                        component={Link}
-                        href={`/content/${item.id}/miniseries-episodes`}
-                      >
-                        Episodes
-                      </Button>
-                    )}
+                      {item.content_type === "series" && (
+                        <Button
+                          size="small"
+                          component={Link}
+                          href={`/content/${item.id}/seasons`}
+                        >
+                          Seasons
+                        </Button>
+                      )}
+                      {item.content_type === "miniseries" && (
+                        <Button
+                          size="small"
+                          component={Link}
+                          href={`/content/${item.id}/miniseries-episodes`}
+                        >
+                          Episodes
+                        </Button>
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -288,21 +351,39 @@ export function ContentListView() {
         channels={channels}
         onSave={handleSave}
       />
-      <Dialog open={Boolean(playUrl)} onClose={() => setPlayUrl("")} fullWidth maxWidth="md">
-        <DialogTitle>Video playback</DialogTitle>
+      <Dialog open={Boolean(playingContent)} onClose={handleClosePlayer} fullWidth maxWidth="md">
+        <DialogTitle>{playingContent?.title || "Video playback"}</DialogTitle>
         <DialogContent>
-          {playUrl.includes("mux.com") ? (
+          {playbackError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {playbackError}
+            </Alert>
+          )}
+          {playingContent?.streaming_link.includes("mux.com") ? (
             <MuxPlayer
-              playbackId={playUrl.split("/").pop()?.split(".")[0] || ""}
+              key={playingContent.streaming_link}
+              playbackId={playingContent.streaming_link.split("/").pop()?.split(".")[0] || ""}
               style={{ width: "100%", aspectRatio: "16/9" }}
+              onError={() => setPlaybackError("This video could not be played.")}
               autoPlay
             />
-          ) : (
-            <video key={playUrl} src={playUrl} controls autoPlay style={{ width: "100%" }}>
+          ) : playingContent ? (
+            <video
+              ref={videoRef}
+              key={playingContent.streaming_link}
+              src={playingContent.streaming_link}
+              controls
+              autoPlay
+              onError={() => setPlaybackError("This video could not be played.")}
+              style={{ width: "100%", maxHeight: "70vh", backgroundColor: "black" }}
+            >
               Your browser does not support video playback.
             </video>
-          )}
+          ) : null}
         </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePlayer}>Close</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

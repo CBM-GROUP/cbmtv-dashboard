@@ -1,4 +1,5 @@
 import type { ChangeEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { BiLoader, BiUpload } from 'react-icons/bi';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -13,6 +14,22 @@ interface ImageUploaderProps {
 
 export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
   const uploader = useMediaUpload('image');
+  const [previewFailed, setPreviewFailed] = useState(false);
+
+  useEffect(() => {
+    setPreviewFailed(false);
+  }, [value]);
+
+  const hasValidPreviewUrl = (() => {
+    if (!value) return false;
+
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  })();
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) {
@@ -46,18 +63,30 @@ export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
         <TextField margin="dense" label={label} type="text" fullWidth value={value} disabled />
       </div>
       {uploader.error && <p role="alert">{uploader.error}</p>}
-      {value && (
+      {value && !hasValidPreviewUrl && (
+        <p role="alert">Thumbnail URL must be a complete HTTP or HTTPS URL.</p>
+      )}
+      {hasValidPreviewUrl && !previewFailed && (
         <Box mt={2} sx={{ display: 'flex', justifyContent: 'center' }}>
           <Image
             src={value}
             alt="Preview"
-            width={0}
-            height={0}
-            sizes="100vw"
-            className="object-cover"
-            style={{ width: '100%', height: 'auto', maxHeight: 200, borderRadius: 8 }}
+            width={480}
+            height={270}
+            sizes="(max-width: 600px) 100vw, 480px"
+            onError={() => setPreviewFailed(true)}
+            style={{
+              width: '100%',
+              height: 'auto',
+              maxHeight: 270,
+              borderRadius: 8,
+              objectFit: 'contain',
+            }}
           />
         </Box>
+      )}
+      {hasValidPreviewUrl && previewFailed && (
+        <p role="alert">The uploaded thumbnail could not be displayed.</p>
       )}
     </>
   );
