@@ -1,5 +1,5 @@
 import apiClient from "./api";
-import { Content } from "@/types";
+import { Content, ContentPayload } from "@/types";
 import { normalizeListResponse } from "./normalizeListResponse";
 
 export const contentService = {
@@ -8,12 +8,12 @@ export const contentService = {
     return normalizeListResponse<Content>(response.data);
   },
 
-  async createContent(data: Omit<Content, 'id'>) {
+  async createContent(data: ContentPayload) {
     const response = await apiClient.post("/api/content/", data);
     return response.data;
   },
 
-  async updateContent(id: string, data: Partial<Omit<Content, 'id'>>) {
+  async updateContent(id: string, data: Partial<ContentPayload>) {
     const response = await apiClient.patch(`/api/content/${id}/`, data);
     return response.data;
   },

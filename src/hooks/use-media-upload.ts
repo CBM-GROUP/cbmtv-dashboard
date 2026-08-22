@@ -12,62 +12,59 @@ interface UploadTarget {
   headers: Record<string, string>;
 }
 
+// Presigning lives on the backend (Django `MediaUploadTargetView`) so AWS
+// credentials stay server-side in one place. apiClient attaches the bearer
+// token and refreshes it on 401, so no manual retry is needed here.
+const UPLOAD_TARGET_URL = "/api/content/media/upload-target/";
+
 export function useMediaUpload(mediaType: MediaType) {
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [finalUrl, setFinalUrl] = useState("");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
 
-  const requestUploadTarget = async (file: File) => {
-    const payload = {
-      filename: file.name,
-      content_type: file.type,
-      media_type: mediaType,
-    };
-    const request = () =>
-      axios.post<UploadTarget>("/api/media/upload-target", payload, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}`,
-        },
-      });
-
-    try {
-      return await request();
-    } catch (uploadTargetError) {
-      if (!axios.isAxiosError(uploadTargetError) || uploadTargetError.response?.status !== 401) {
-        throw uploadTargetError;
-      }
-
-      await apiClient.get("/api/accounts/profile/");
-      return request();
-    }
-  };
-
   const uploadFile = async (file: File) => {
     setStatus("uploading");
     setError("");
     setProgress(0);
+
+    let target: UploadTarget;
     try {
-      const response = await requestUploadTarget(file);
-      await axios.put(response.data.upload_url, file, {
-        headers: response.data.headers,
-        transformRequest: [(data) => data],
+      const response = await apiClient.post<UploadTarget>(UPLOAD_TARGET_URL, {
+        filename: file.name,
+        content_type: file.type,
+        media_type: mediaType,
+      });
+      target = response.data;
+    } catch (uploadTargetError) {
+      const message =
+        (axios.isAxiosError(uploadTargetError) && uploadTargetError.response?.data?.error) ||
+        "Could not start the upload. Please try again.";
+      setError(message);
+      setStatus("error");
+      throw uploadTargetError;
+    }
+
+    try {
+      // Sent straight to S3, so this must not carry the API's Authorization
+      // header — hence bare axios rather than apiClient.
+      await axios.put(target.upload_url, file, {
+        headers: target.headers,
+        transformRequest: [(body) => body],
         onUploadProgress: ({ loaded, total }) => {
           if (total) setProgress(Math.round((loaded / total) * 100));
         },
       });
-      setFinalUrl(response.data.delivery_url);
-      setProgress(100);
-      setStatus("success");
-      return response.data.delivery_url;
     } catch (uploadError) {
-      const message = axios.isAxiosError(uploadError)
-        ? uploadError.response?.data?.error || "Upload failed. Please try again."
-        : "Upload failed. Please try again.";
-      setError(message);
+      setError("Upload to storage failed. Please try again.");
       setStatus("error");
       throw uploadError;
     }
+
+    setFinalUrl(target.delivery_url);
+    setProgress(100);
+    setStatus("success");
+    return target.delivery_url;
   };
 
   return { status, finalUrl, error, progress, uploadFile };

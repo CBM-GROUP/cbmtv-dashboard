@@ -28,6 +28,38 @@ import { Content, Channel } from "@/types";
 
 dayjs.extend(duration);
 
+/**
+ * The API stores duration as a Django DurationField, which DRF serialises as
+ * "[DD ]HH:MM:SS[.ffffff]" but accepts as either that or a bare second count.
+ * The form edits it as a plain number of seconds, so incoming values have to be
+ * normalised — `parseInt("00:01:30")` silently yields 0.
+ */
+function durationToSeconds(value: string | number | null | undefined): number {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? Math.floor(value) : 0;
+
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+
+  const [dayPart, clockPart] = trimmed.includes(" ")
+    ? [trimmed.slice(0, trimmed.indexOf(" ")), trimmed.slice(trimmed.indexOf(" ") + 1)]
+    : ["0", trimmed];
+
+  const parts = clockPart.split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return 0;
+  while (parts.length < 3) parts.unshift(0);
+
+  const [hours, minutes, seconds] = parts;
+  const days = Number(dayPart);
+  return (
+    (Number.isFinite(days) ? days : 0) * 86400 +
+    hours * 3600 +
+    minutes * 60 +
+    Math.floor(seconds)
+  );
+}
+
 interface ContentFormProps {
   open: boolean;
   onClose: () => void;
@@ -53,7 +85,6 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     size: "",
     duration: "",
   });
-  const [duration, setDuration] = useState({ hours: 0, minutes: 0 });
   const [formError, setFormError] = useState("");
 
   const trailerUploader = useMediaUpload("video");
@@ -62,14 +93,10 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   useEffect(() => {
     setFormError("");
     if (editItem) {
-      setFormData(editItem);
-      if (editItem.duration) {
-        const totalMinutes = parseInt(editItem.duration, 10);
-        setDuration({
-          hours: Math.floor(totalMinutes / 60),
-          minutes: totalMinutes % 60,
-        });
-      }
+      setFormData({
+        ...editItem,
+        duration: editItem.duration ? String(durationToSeconds(editItem.duration)) : "",
+      });
     } else {
       setFormData({
         title: "",
@@ -102,11 +129,6 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     }
   }, [streamUploader.finalUrl]);
 
-  useEffect(() => {
-    const totalMinutes = duration.hours * 60 + duration.minutes;
-    setFormData((prev) => ({ ...prev, duration: String(totalMinutes) }));
-  }, [duration]);
-
   const handleChange = (
     e:
       | ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>
@@ -128,11 +150,16 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     }
 
     try {
+      const trimmedDuration = (formData.duration ?? "").trim();
+      const trimmedSize = (formData.size ?? "").trim();
+
       const data = {
         ...formData,
         channel: Number(formData.channel),
-        size: String(parseInt(formData.size, 10) || 0),
-        duration: formData.duration,
+        // Both are nullable on the model; send null rather than coercing a
+        // blank field to "0", which previously overwrote real values.
+        size: trimmedSize === "" ? null : trimmedSize,
+        duration: trimmedDuration === "" ? null : String(durationToSeconds(trimmedDuration)),
       };
 
       if (editItem) {

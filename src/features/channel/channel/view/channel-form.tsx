@@ -22,23 +22,32 @@ interface ChannelFormProps {
 }
 
 export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFormProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<Channel, 'id'>>({
     name: '',
+    description: '',
+    logo_url: '',
     cover_image_url: '',
   });
 
   useEffect(() => {
     if (editItem) {
-      setFormData(editItem);
+      setFormData({
+        name: editItem.name ?? '',
+        description: editItem.description ?? '',
+        logo_url: editItem.logo_url ?? '',
+        cover_image_url: editItem.cover_image_url ?? '',
+      });
     } else {
       setFormData({
         name: '',
+        description: '',
+        logo_url: '',
         cover_image_url: '',
       });
     }
   }, [editItem]);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -70,8 +79,24 @@ export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFo
           value={formData.name}
           onChange={handleChange}
         />
+        <TextField
+          margin="dense"
+          name="description"
+          label="Description"
+          type="text"
+          fullWidth
+          multiline
+          minRows={2}
+          value={formData.description}
+          onChange={handleChange}
+        />
         <ImageUploader
           label="Logo URL"
+          value={formData.logo_url}
+          onUpload={(url) => setFormData({ ...formData, logo_url: url })}
+        />
+        <ImageUploader
+          label="Cover Image URL"
           value={formData.cover_image_url}
           onUpload={(url) => setFormData({ ...formData, cover_image_url: url })}
         />

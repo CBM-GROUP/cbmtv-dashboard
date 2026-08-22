@@ -16,10 +16,23 @@ export interface Content {
   duration: string;
 }
 
+/**
+ * What the API accepts on write. `size` and `duration` are nullable on the
+ * model, and a blank form field must clear them rather than store "0".
+ */
+export type ContentPayload = Omit<Content, "id" | "size" | "duration"> & {
+  size: string | null;
+  duration: string | null;
+};
+
 export interface Channel {
   id: string;
   name: string;
-  cover_image_url: string;
+  description: string;
+  // Nullable in the API: both default to null until an editor uploads one.
+  // Declaring these as plain `string` hid a next/image crash on null src.
+  logo_url: string | null;
+  cover_image_url: string | null;
 }
 
 export interface Advert {
