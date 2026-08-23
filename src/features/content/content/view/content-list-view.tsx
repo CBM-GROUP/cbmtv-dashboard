@@ -35,6 +35,7 @@ import { channelService } from "src/services/channelService";
 import { contentService } from "src/services/contentService";
 
 import { RemoteThumbnail } from "src/components/remote-thumbnail";
+import { useUploadManager } from "@/components/upload/upload-manager";
 
 import { Channel, Content } from "@/types";
 
@@ -104,6 +105,7 @@ export function ContentListView() {
   const [playingContent, setPlayingContent] = useState<Content | null>(null);
   const [playbackError, setPlaybackError] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const { subscribeToAttached } = useUploadManager();
 
   const [tab, setTab] = useState("movies");
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,6 +148,17 @@ export function ContentListView() {
     fetchContent();
     fetchChannels();
   }, [searchParams]);
+
+  // A background upload writes its URL onto the record directly, so the row on
+  // screen is stale the moment it finishes. Read the latest fetch through a ref
+  // to keep the subscription itself from resubscribing on every render.
+  const fetchContentRef = useRef(fetchContent);
+  fetchContentRef.current = fetchContent;
+
+  useEffect(
+    () => subscribeToAttached(() => fetchContentRef.current()),
+    [subscribeToAttached],
+  );
 
   const handleOpen = (item: Content | null = null) => {
     setEditItem(item);
