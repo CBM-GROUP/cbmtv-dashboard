@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
@@ -25,6 +24,7 @@ import { miniseriesEpisodeService } from "src/services/miniseriesEpisodeService"
 import { MiniseriesEpisodeForm } from "./miniseries-episode-form";
 
 import { Episode } from "@/types";
+import { RemoteThumbnail } from "src/components/remote-thumbnail";
 
 dayjs.extend(duration);
 
@@ -133,13 +133,7 @@ export function MiniseriesEpisodeListView({
               .map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <Image
-                      src={item.thumbnail}
-                      alt={item.title}
-                      width={80}
-                      height={45}
-                      style={{ borderRadius: 4, objectFit: "cover" }}
-                    />
+                    <RemoteThumbnail src={item.thumbnail} label={item.title} />
                   </TableCell>
                   <TableCell>{item.title}</TableCell>
                   <TableCell>{item.miniseries_no}</TableCell>

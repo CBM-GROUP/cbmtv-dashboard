@@ -8,7 +8,8 @@ import { useMediaUpload } from '@/hooks/use-media-upload';
 
 interface ImageUploaderProps {
   onUpload: (url: string) => void;
-  value: string;
+  /** Null until an editor uploads one; the API returns null for unset media. */
+  value: string | null | undefined;
   label: string;
 }
 
@@ -60,7 +61,7 @@ export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
           </div>
         </div>
 
-        <TextField margin="dense" label={label} type="text" fullWidth value={value} disabled />
+        <TextField margin="dense" label={label} type="text" fullWidth value={value ?? ''} disabled />
       </div>
       {uploader.error && <p role="alert">{uploader.error}</p>}
       {value && !hasValidPreviewUrl && (
@@ -69,11 +70,16 @@ export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
       {hasValidPreviewUrl && !previewFailed && (
         <Box mt={2} sx={{ display: 'flex', justifyContent: 'center' }}>
           <Image
-            src={value}
+            src={value as string}
             alt="Preview"
             width={480}
             height={270}
             sizes="(max-width: 600px) 100vw, 480px"
+            // Previews point at whatever host an editor saved. next/image
+            // THROWS during render for a hostname missing from next.config.js
+            // remotePatterns, which takes down the whole form and never
+            // reaches onError. unoptimized skips that host check.
+            unoptimized
             onError={() => setPreviewFailed(true)}
             style={{
               width: '100%',

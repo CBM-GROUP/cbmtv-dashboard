@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -18,6 +17,8 @@ import TablePagination from '@mui/material/TablePagination';
 
 import { useAuth } from 'src/features/auth/context';
 import { channelService } from 'src/services/channelService';
+
+import { RemoteThumbnail } from 'src/components/remote-thumbnail';
 
 import { Channel } from '@/types';
 
@@ -123,15 +124,12 @@ export function ChannelListView() {
               .map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <Image
+                    <RemoteThumbnail
                       src={item.cover_image_url}
-                      alt={item.name}
+                      label={item.name}
                       width={50}
                       height={50}
-                      style={{
-                        borderRadius: 8,
-                        objectFit: 'cover',
-                      }}
+                      borderRadius={8}
                     />
                   </TableCell>
                   <TableCell>{item.name}</TableCell>

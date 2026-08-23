@@ -3,7 +3,6 @@ import duration from "dayjs/plugin/duration";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -34,6 +33,8 @@ import { ContentForm } from "./content-form";
 import { channelService } from "src/services/channelService";
 import { contentService } from "src/services/contentService";
 
+import { RemoteThumbnail } from "src/components/remote-thumbnail";
+
 import { Channel, Content } from "@/types";
 
 dayjs.extend(duration);
@@ -45,47 +46,6 @@ function isPlayableUrl(value: string) {
   } catch {
     return false;
   }
-}
-
-function ContentThumbnail({ src, title }: { src: string; title: string }) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [src]);
-
-  if (!isPlayableUrl(src) || failed) {
-    return (
-      <Box
-        aria-label={src ? `Thumbnail unavailable for ${title}` : `No thumbnail for ${title}`}
-        sx={{
-          width: 80,
-          height: 45,
-          borderRadius: 1,
-          bgcolor: "action.hover",
-          color: "text.secondary",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          textAlign: "center",
-        }}
-      >
-        No image
-      </Box>
-    );
-  }
-
-  return (
-    <Image
-      src={src}
-      alt={`${title} thumbnail`}
-      width={80}
-      height={45}
-      onError={() => setFailed(true)}
-      style={{ width: 80, height: 45, borderRadius: 4, objectFit: "cover" }}
-    />
-  );
 }
 
 export function ContentListView() {
@@ -277,7 +237,7 @@ export function ContentListView() {
               .map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <ContentThumbnail src={item.thumbnail} title={item.title} />
+                    <RemoteThumbnail src={item.thumbnail} label={item.title} />
                   </TableCell>
                   <TableCell>{item.title}</TableCell>
                   <TableCell>{item.content_type}</TableCell>
