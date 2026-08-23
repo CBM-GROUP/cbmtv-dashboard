@@ -78,6 +78,8 @@ interface UploadTargetResponse {
   object_key: string;
   delivery_url: string;
   headers: Record<string, string>;
+  /** Seconds the upload URL stays valid; sized by the backend to size_bytes. */
+  expires_in?: number;
 }
 
 const ACTIVE_STATUSES: UploadStatus[] = ["presigning", "uploading", "attaching"];
@@ -131,7 +133,14 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       try {
         const response = await apiClient.post<UploadTargetResponse>(
           UPLOAD_TARGET_URL,
-          { filename: file.name, content_type: file.type, media_type: mediaType },
+          {
+            filename: file.name,
+            content_type: file.type,
+            media_type: mediaType,
+            // The backend sizes the presigned URL's lifetime to this, so a
+            // large file is not handed a window it cannot finish inside.
+            size_bytes: file.size,
+          },
           { signal: controller.signal },
         );
         target = response.data;
@@ -157,8 +166,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           },
         });
       } catch (error) {
+        const minutes = Math.round((target.expires_in ?? 3600) / 60);
         failed(
-          "Upload to storage failed. The upload link is valid for one hour -- retry to get a fresh one.",
+          `Upload to storage failed. The upload link was valid for ${minutes} minutes -- retry to get a fresh one.`,
         );
         throw error;
       }
