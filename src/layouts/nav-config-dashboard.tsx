@@ -1,5 +1,5 @@
 import { MdDashboard } from 'react-icons/md';
-import { BiCloudUpload, BiSolidVideos } from 'react-icons/bi';
+import { BiSolidVideos } from 'react-icons/bi';
 import { BsPersonFill, BsDisplayFill, BsMegaphoneFill, BsFillPeopleFill } from 'react-icons/bs';
 
 export type NavItem = {
@@ -26,11 +26,6 @@ export const navData = [
     title: 'Content',
     path: '/content-list',
     icon: <BiSolidVideos />,
-  },
-  {
-    title: 'Media Upload',
-    path: '/upload',
-    icon: <BiCloudUpload />,
   },
   {
     title: 'Adverts',
