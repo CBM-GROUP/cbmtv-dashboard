@@ -1,11 +1,10 @@
 import apiClient from "./api";
 import { Channel } from "@/types";
-import { normalizeListResponse } from "./normalizeListResponse";
+import { fetchAllPages } from "./fetchAllPages";
 
 export const channelService = {
   async getChannels(): Promise<Channel[]> {
-    const response = await apiClient.get("/api/channels/");
-    return normalizeListResponse<Channel>(response.data);
+    return fetchAllPages<Channel>(apiClient, "/api/channels/");
   },
 
   async createChannel(data: Omit<Channel, 'id'>) {

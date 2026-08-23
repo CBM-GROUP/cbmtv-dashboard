@@ -2,6 +2,7 @@ import type { ChangeEvent } from 'react';
 import { useEffect, useState } from 'react';
 
 
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -10,6 +11,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 
 import { channelService } from 'src/services/channelService';
+import { getApiErrorMessage } from 'src/services/apiError';
 import { ImageUploader } from '@/components/image-uploader';
 
 import { Channel } from '@/types';
@@ -28,8 +30,11 @@ export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFo
     logo_url: '',
     cover_image_url: '',
   });
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setError(null);
     if (editItem) {
       setFormData({
         name: editItem.name ?? '',
@@ -52,6 +57,8 @@ export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFo
   };
 
   const handleSubmit = async () => {
+    setSaving(true);
+    setError(null);
     try {
       if (editItem) {
         await channelService.updateChannel(editItem.id, formData);
@@ -60,8 +67,14 @@ export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFo
       }
       onSave();
       onClose();
-    } catch (error) {
-      console.error('Failed to save channel', error);
+    } catch (err) {
+      // The dialog stays open on failure: closing it discarded the user's
+      // input and left them with nothing but a console line to go on.
+      const message = getApiErrorMessage(err, 'Failed to save channel');
+      console.error('Failed to save channel', message, err);
+      setError(message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -69,6 +82,11 @@ export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFo
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>{editItem ? 'Edit Channel' : 'Create Channel'}</DialogTitle>
       <DialogContent>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
+            {error}
+          </Alert>
+        )}
         <TextField
           autoFocus
           margin="dense"
@@ -102,8 +120,12 @@ export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFo
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSubmit}>Save</Button>
+        <Button onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} disabled={saving || !formData.name.trim()}>
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
       </DialogActions>
     </Dialog>
   );

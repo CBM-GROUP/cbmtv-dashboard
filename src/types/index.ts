@@ -4,9 +4,12 @@ export interface Content {
   content_type: string;
   channel: number;
   description: string;
-  trailer_link: string;
-  streaming_link: string;
-  thumbnail: string;
+  // Nullable/empty in the API: a content row is normally created before its
+  // media is uploaded. Typing these as plain `string` hid the fact that the
+  // Play action and thumbnail have to handle "not uploaded yet".
+  trailer_link: string | null;
+  streaming_link: string | null;
+  thumbnail: string | null;
   director: string;
   writer: string;
   genre: string;

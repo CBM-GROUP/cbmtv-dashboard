@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
@@ -17,6 +18,7 @@ import TablePagination from '@mui/material/TablePagination';
 
 import { useAuth } from 'src/features/auth/context';
 import { channelService } from 'src/services/channelService';
+import { getApiErrorMessage } from 'src/services/apiError';
 
 import { RemoteThumbnail } from 'src/components/remote-thumbnail';
 
@@ -32,6 +34,7 @@ export function ChannelListView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChangePage = (event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
     setPage(newPage);
@@ -48,8 +51,13 @@ export function ChannelListView() {
     try {
       const data = await channelService.getChannels();
       setChannels(data);
-    } catch (error) {
-      console.error('Failed to fetch channels', error);
+      setError(null);
+    } catch (err) {
+      // Without this the table just renders empty on a failed load, which
+      // reads as "no channels yet" and invites duplicate-name create attempts.
+      const message = getApiErrorMessage(err, 'Failed to load channels');
+      console.error('Failed to fetch channels', message, err);
+      setError(message);
     }
   };
 
@@ -77,8 +85,10 @@ export function ChannelListView() {
     try {
       await channelService.deleteChannel(id);
       fetchChannels();
-    } catch (error) {
-      console.error('Failed to delete channel', error);
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Failed to delete channel');
+      console.error('Failed to delete channel', message, err);
+      setError(message);
     }
   };
 
@@ -108,6 +118,11 @@ export function ChannelListView() {
           </Button>
         
       </Box>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, whiteSpace: 'pre-line' }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
       <TableContainer component={Card}>
         <Table>
           <TableHead>

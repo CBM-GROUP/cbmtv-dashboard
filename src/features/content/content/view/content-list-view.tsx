@@ -12,6 +12,7 @@ import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Tab from "@mui/material/Tab";
+import Tooltip from "@mui/material/Tooltip";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -39,13 +40,55 @@ import { Channel, Content } from "@/types";
 
 dayjs.extend(duration);
 
-function isPlayableUrl(value: string) {
+function isPlayableUrl(value: string | null | undefined): value is string {
+  // Empty/null is the common case for a row whose video has not been uploaded
+  // yet -- check it explicitly rather than relying on new URL() throwing.
+  if (!value) return false;
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }
+}
+
+/**
+ * The Play action.
+ *
+ * Previously this was `{isPlayableUrl(...) && <Button/>}`, which removed the
+ * button entirely for any row without a video. That is indistinguishable from
+ * the feature being broken or undeployed, and it is the common case: content
+ * rows are created before the video is uploaded. Render a disabled button with
+ * the reason instead of silently omitting it.
+ */
+function PlayAction({ item, onPlay }: { item: Content; onPlay: () => void }) {
+  if (isPlayableUrl(item.streaming_link)) {
+    return (
+      <Button size="small" onClick={onPlay}>
+        Play
+      </Button>
+    );
+  }
+
+  const isContainer =
+    item.content_type === "series" || item.content_type === "miniseries";
+
+  return (
+    <Tooltip
+      title={
+        isContainer
+          ? "A series has no video of its own — open its episodes to play them"
+          : "No video uploaded for this item yet"
+      }
+    >
+      {/* MUI needs a wrapper: a disabled button emits no pointer events. */}
+      <span>
+        <Button size="small" disabled>
+          Play
+        </Button>
+      </span>
+    </Tooltip>
+  );
 }
 
 export function ContentListView() {
@@ -251,17 +294,13 @@ export function ContentListView() {
                       <Button size="small" onClick={() => handleOpen(item)}>
                         Edit
                       </Button>
-                      {isPlayableUrl(item.streaming_link) && (
-                        <Button
-                          size="small"
-                          onClick={() => {
-                            setPlaybackError("");
-                            setPlayingContent(item);
-                          }}
-                        >
-                          Play
-                        </Button>
-                      )}
+                      <PlayAction
+                        item={item}
+                        onPlay={() => {
+                          setPlaybackError("");
+                          setPlayingContent(item);
+                        }}
+                      />
                       <Button
                         size="small"
                         color="error"
@@ -319,7 +358,7 @@ export function ContentListView() {
               {playbackError}
             </Alert>
           )}
-          {playingContent?.streaming_link.includes("mux.com") ? (
+          {playingContent?.streaming_link?.includes("mux.com") ? (
             <MuxPlayer
               key={playingContent.streaming_link}
               playbackId={playingContent.streaming_link.split("/").pop()?.split(".")[0] || ""}
@@ -331,7 +370,7 @@ export function ContentListView() {
             <video
               ref={videoRef}
               key={playingContent.streaming_link}
-              src={playingContent.streaming_link}
+              src={playingContent.streaming_link ?? undefined}
               controls
               autoPlay
               onError={() => setPlaybackError("This video could not be played.")}

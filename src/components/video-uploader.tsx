@@ -8,7 +8,8 @@ interface VideoUploaderProps {
   status: string;
   progress: number;
   error: string;
-  finalUrl: string;
+  /** Null/empty until the video is uploaded. */
+  finalUrl: string | null | undefined;
   onUpload: (file: File) => Promise<string>;
 }
 
@@ -32,7 +33,7 @@ export function VideoUploader({ label, status, progress, error, finalUrl, onUplo
         label={`${label} URL`}
         type="text"
         fullWidth
-        value={finalUrl}
+        value={finalUrl ?? ''}
         disabled
       />
     </>
