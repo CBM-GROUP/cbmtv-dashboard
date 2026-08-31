@@ -39,7 +39,14 @@ export function EpisodeListView() {
     file_url: "",
   });
 
-  const uploader = useMediaUpload("video");
+  // In edit mode the episode exists, so a finished upload can write its own
+  // URL onto the record and the dialog is free to close.
+  const uploader = useMediaUpload("video", {
+    label: editItem ? `Episode - ${editItem.title}` : "Episode video",
+    attach: editItem
+      ? { endpoint: `/api/content/episodes/${editItem.id}/`, field: "file_url" }
+      : undefined,
+  });
 
   useEffect(() => {
     if (uploader.finalUrl) {

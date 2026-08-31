@@ -10,8 +10,8 @@ import { useTheme } from "@mui/material/styles";
 import ListItemButton from "@mui/material/ListItemButton";
 import Drawer, { drawerClasses } from "@mui/material/Drawer";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-// import { RouterLink } from 'src/routes/components';
 
 import { Scrollbar } from "src/components/scrollbar";
 
@@ -144,7 +144,10 @@ export function NavContent({ data, slots, sx }: NavContentProps) {
                 <ListItem disableGutters disablePadding key={item.title}>
                   <ListItemButton
                     disableGutters
-                    // component={RouterLink}
+                    // Without this the ListItemButton renders a plain <a>, so
+                    // every sidebar click is a full page load -- which also
+                    // kills any in-flight background upload.
+                    component={Link}
                     href={item.path}
                     sx={[
                       (theme) => ({

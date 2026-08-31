@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
 
+import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
@@ -87,11 +88,53 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   });
   const [formError, setFormError] = useState("");
 
-  const trailerUploader = useMediaUpload("video");
-  const streamUploader = useMediaUpload("video");
+  /**
+   * Set when a *new* item is saved early to give a background upload something
+   * to attach to. From then on this dialog edits that record rather than
+   * creating another one.
+   */
+  const [autoSavedId, setAutoSavedId] = useState<string | null>(null);
+  const contentId = editItem?.id ?? autoSavedId;
+
+  /**
+   * Videos are uploaded straight to S3 and the URL is PATCHed onto the record
+   * when the transfer finishes, so the record has to exist first. For a new
+   * item that means saving it now -- which is why picking a video needs the
+   * same validation as Save.
+   */
+  const ensureSaved = async () => {
+    if (contentId) return contentId;
+
+    if (!formData.title.trim()) {
+      throw new Error("Add a title before uploading video.");
+    }
+    if (Number(formData.channel) <= 0) {
+      throw new Error("Select a channel before uploading video.");
+    }
+
+    const created = await contentService.createContent(buildPayload());
+    setAutoSavedId(created.id);
+    onSave();
+    return created.id as string;
+  };
+
+  const attachTo = (field: "trailer_link" | "streaming_link") => async () => ({
+    endpoint: `/api/content/${await ensureSaved()}/`,
+    field,
+  });
+
+  const trailerUploader = useMediaUpload("video", {
+    label: "Trailer",
+    resolveAttach: attachTo("trailer_link"),
+  });
+  const streamUploader = useMediaUpload("video", {
+    label: "Streaming video",
+    resolveAttach: attachTo("streaming_link"),
+  });
 
   useEffect(() => {
     setFormError("");
+    setAutoSavedId(null);
     if (editItem) {
       setFormData({
         ...editItem,
@@ -143,6 +186,21 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     });
   };
 
+  // A function declaration so `ensureSaved`, defined above it, can call it.
+  function buildPayload() {
+    const trimmedDuration = (formData.duration ?? "").trim();
+    const trimmedSize = (formData.size ?? "").trim();
+
+    return {
+      ...formData,
+      channel: Number(formData.channel),
+      // Both are nullable on the model; send null rather than coercing a
+      // blank field to "0", which previously overwrote real values.
+      size: trimmedSize === "" ? null : trimmedSize,
+      duration: trimmedDuration === "" ? null : String(durationToSeconds(trimmedDuration)),
+    };
+  }
+
   const handleSubmit = async () => {
     if (Number(formData.channel) <= 0) {
       setFormError("Select a channel before saving content.");
@@ -150,22 +208,12 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     }
 
     try {
-      const trimmedDuration = (formData.duration ?? "").trim();
-      const trimmedSize = (formData.size ?? "").trim();
-
-      const data = {
-        ...formData,
-        channel: Number(formData.channel),
-        // Both are nullable on the model; send null rather than coercing a
-        // blank field to "0", which previously overwrote real values.
-        size: trimmedSize === "" ? null : trimmedSize,
-        duration: trimmedDuration === "" ? null : String(durationToSeconds(trimmedDuration)),
-      };
-
-      if (editItem) {
-        await contentService.updateContent(editItem.id, data);
+      // `contentId` covers the auto-save that a background upload triggers, so
+      // saving afterwards updates that record instead of creating a duplicate.
+      if (contentId) {
+        await contentService.updateContent(contentId, buildPayload());
       } else {
-        await contentService.createContent(data);
+        await contentService.createContent(buildPayload());
       }
       onSave();
       onClose();
@@ -177,9 +225,15 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   return (
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>
-        {editItem ? "Edit Content" : "Create Content"}
+        {editItem || autoSavedId ? "Edit Content" : "Create Content"}
       </DialogTitle>
       <DialogContent>
+        {autoSavedId && (
+          <Alert severity="info" sx={{ mb: 1 }}>
+            Saved so the upload can finish in the background. You can close this
+            dialog — the video link is attached when it completes.
+          </Alert>
+        )}
         <TextField
           autoFocus
           margin="dense"
