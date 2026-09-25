@@ -10,6 +10,8 @@ Prepare and deploy to Vercel
 3) Required environment variables (set these in Vercel Project Settings -> Environment Variables)
 - NEXT_PUBLIC_API_BASE_URL — must include the scheme, e.g. `https://api.example.com`.
   A bare hostname makes axios resolve calls against the dashboard's own origin.
+  Set this for both Production and Preview if both environments use the backend.
+  Changes take effect only after a new deployment or redeployment.
 - NEXT_PUBLIC_MEILISEARCH_URL
 - NEXT_PUBLIC_MEILISEARCH_API_KEY
 - NEXT_PUBLIC_GOOGLE_CLIENT_ID
@@ -47,3 +49,7 @@ belong in the backend's environment only.
 7) Troubleshooting
 - If the deployed app still tries to seed or run Prisma: ensure `@prisma/client` and `prisma` are removed from `package.json`, and that your project on Vercel is using the latest commit.
 - If assets are large or upload times are long, add additional ignore rules to `.vercelignore`.
+- On Vercel Hobby, the author of a commit deployed from Git must be the Vercel
+  project owner. GitHub merge commits can be authored by the account that merges
+  the pull request, even when the branch commits have a different author. Merge
+  into the production branch with the GitHub account linked to the project owner.
