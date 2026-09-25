@@ -7,9 +7,12 @@ export class AuthError extends Error {
   }
 }
 
-const configuredApiUrl =
-  process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
-const API_URL = configuredApiUrl?.replace(/\/+$/, '');
+const rawApiUrl =
+  process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
+const trimmedApiUrl = rawApiUrl.trim().replace(/\/+$/, '');
+const API_URL = trimmedApiUrl
+  ? (/^https?:\/\//i.test(trimmedApiUrl) ? trimmedApiUrl : `https://${trimmedApiUrl}`)
+  : '';
 const REFRESH_URL = '/api/accounts/token/refresh/';
 
 export const unauthorizedEvent = new Event('unauthorized');

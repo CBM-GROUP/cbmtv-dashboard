@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 
 import { useState, useEffect, useContext, useCallback, createContext } from 'react';
-import axios from 'axios';
 
 import apiClient from 'src/services/api';
 
@@ -36,8 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(async (email: string, password: string): Promise<User> => {
     try {
-      // Use standard axios to hit the local Next.js API route instead of external API
-      const response = await axios.post('/api/accounts/login', { email, password });
+      const response = await apiClient.post('/api/accounts/login/', { email, password });
       const { access, refresh } = response.data;
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
@@ -60,9 +58,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = useCallback(async (formData: Record<string, string>) => {
     try {
-      await axios.post('/api/accounts/register', formData);
+      await apiClient.post('/api/accounts/register/', formData);
     } catch (error) {
       console.error('Registration failed', error);
+      throw error;
     }
   }, []);
 

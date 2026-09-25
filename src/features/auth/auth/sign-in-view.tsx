@@ -12,6 +12,8 @@ import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
 import { Alert } from '@mui/material';
 
+import axios from 'axios';
+
 import { useRouter } from 'src/hooks/use-router';
 
 import { Iconify } from 'src/components/iconify';
@@ -43,8 +45,19 @@ export function SignInView() {
     try {
       await login(formData.email, formData.password);
       router.push('/');
-    } catch (err) {
-      setError('Failed to sign in. Please check your credentials.');
+    } catch (err: unknown) {
+      let serverMessage: string | null = null;
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const data = err.response.data as Record<string, unknown>;
+        if (typeof data.detail === 'string') {
+          serverMessage = data.detail;
+        } else if (typeof data.error === 'string') {
+          serverMessage = data.error;
+        } else if (typeof err.response.data === 'string') {
+          serverMessage = err.response.data;
+        }
+      }
+      setError(serverMessage || 'Failed to sign in. Please check your credentials.');
       console.error(err);
     } finally {
       setLoading(false);

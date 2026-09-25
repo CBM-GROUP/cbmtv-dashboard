@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import axios from 'axios';
 import apiClient from '@/services/api';
-import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
   try {
@@ -11,11 +11,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    // Proxy registration to central backend
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Proxy registration to central backend (backend Django handles password hashing)
     const response = await apiClient.post('/api/accounts/register/', {
       email,
-      password: hashedPassword,
+      password,
       name,
       phone,
       location,
@@ -24,8 +23,16 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(response.data, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    let status = 500;
+    let data: unknown = { error: 'Internal server error' };
+    if (axios.isAxiosError(error) && error.response) {
+      status = error.response.status;
+      data = error.response.data;
+    } else if (error instanceof Error) {
+      data = { error: error.message };
+    }
+    return NextResponse.json(data, { status });
   }
 }
