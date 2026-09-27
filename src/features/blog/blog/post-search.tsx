@@ -1,10 +1,8 @@
-import type { Theme, SxProps } from '@mui/material/styles';
+import { useId } from 'react';
+import { SearchIcon } from 'lucide-react';
 
-import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import Autocomplete, { autocompleteClasses } from '@mui/material/Autocomplete';
-
-import { Iconify } from 'src/components/iconify';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 
 import type { IPostItem } from './post-item';
 
@@ -12,48 +10,28 @@ import type { IPostItem } from './post-item';
 
 type PostSearchProps = {
   posts: IPostItem[];
-  sx?: SxProps<Theme>;
+  className?: string;
 };
 
-export function PostSearch({ posts, sx }: PostSearchProps) {
+/** Title suggestions via the native datalist, standing in for the old MUI Autocomplete. */
+export function PostSearch({ posts, className }: PostSearchProps) {
+  const listId = useId();
+
   return (
-    <Autocomplete
-      sx={{ width: 280 }}
-      autoHighlight
-      popupIcon={null}
-      slotProps={{
-        paper: {
-          sx: {
-            width: 320,
-            [`& .${autocompleteClasses.option}`]: {
-              typography: 'body2',
-            },
-            ...sx,
-          },
-        },
-      }}
-      options={posts}
-      getOptionLabel={(post) => post.title}
-      isOptionEqualToValue={(option, value) => option.id === value.id}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          placeholder="Search post..."
-          slotProps={{
-            input: {
-              ...params.InputProps,
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Iconify
-                    icon="eva:search-fill"
-                    sx={{ ml: 1, width: 20, height: 20, color: 'text.disabled' }}
-                  />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-      )}
-    />
+    <div className={cn('relative w-full sm:w-72', className)}>
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        aria-label="Search post"
+        placeholder="Search post..."
+        className="pl-8"
+        list={listId}
+        autoComplete="off"
+      />
+      <datalist id={listId}>
+        {posts.map((post) => (
+          <option key={post.id} value={post.title} />
+        ))}
+      </datalist>
+    </div>
   );
 }
