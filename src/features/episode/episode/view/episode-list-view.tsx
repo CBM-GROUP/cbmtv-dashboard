@@ -2,21 +2,23 @@ import type { ChangeEvent } from "react";
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { PlusIcon } from "lucide-react";
 
-import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
-import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import CardContent from "@mui/material/CardContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { FormDialog } from "@/components/form-dialog";
+import { FormField } from "@/components/form-field";
+import { PageHeader, PageShell } from "@/components/page-shell";
 
 import apiClient from "src/services/api";
 
-import { useAuth } from "src/features/auth/context";
 import { useMediaUpload } from "@/hooks/use-media-upload";
 import { VideoUploader } from "@/components/video-uploader";
 
@@ -28,7 +30,6 @@ interface Episode {
 }
 
 export function EpisodeListView() {
-  const { user } = useAuth()!;
   const { seasonId } = useParams();
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [open, setOpen] = useState(false);
@@ -118,93 +119,76 @@ export function EpisodeListView() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Typography variant="h4">Episodes</Typography>
-
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => handleOpen()}
-        >
-          Create Episode
-        </Button>
-      </Box>
-      <Box
-        sx={{
-          display: "grid",
-          gap: 3,
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-        }}
-      >
-        {episodes.map((item) => (
-          <Card key={item.id}>
-            <CardContent>
-              <Typography variant="h6">{item.title}</Typography>
-              <Typography>Episode {item.episode_number}</Typography>
-
-              <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
-                <Button size="small" onClick={() => handleOpen(item)}>
+    <PageShell>
+      <PageHeader
+        title="Episodes"
+        description="Episodes in this season."
+        actions={
+          <Button onClick={() => handleOpen()}>
+            <PlusIcon />
+            Create Episode
+          </Button>
+        }
+      />
+      {episodes.length === 0 ? (
+        <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
+          No episodes yet.
+        </div>
+      ) : (
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+          {episodes.map((item) => (
+            <Card key={item.id}>
+              <CardHeader>
+                <CardTitle>{item.title}</CardTitle>
+                <CardDescription>Episode {item.episode_number}</CardDescription>
+              </CardHeader>
+              <CardFooter className="justify-end gap-1">
+                <Button variant="ghost" size="sm" onClick={() => handleOpen(item)}>
                   Edit
                 </Button>
-                <Button
-                  size="small"
-                  color="error"
-                  onClick={() => handleDelete(item.id)}
-                >
+                <Button variant="destructive" size="sm" onClick={() => handleDelete(item.id)}>
                   Delete
                 </Button>
-              </Box>
-            </CardContent>
-          </Card>
-        ))}
-      </Box>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <Dialog open={open} onClose={handleClose}>
-        <DialogTitle>
-          {editItem ? "Edit Episode" : "Create Episode"}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            name="title"
-            label="Title"
-            type="text"
-            fullWidth
-            value={formData.title}
-            onChange={handleChange}
-          />
-          <TextField
-            margin="dense"
+      <FormDialog
+        open={open}
+        onClose={handleClose}
+        title={editItem ? "Edit Episode" : "Create Episode"}
+        footer={
+          <>
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit}>Save</Button>
+          </>
+        }
+      >
+        <FormField label="Title" htmlFor="episode-title">
+          <Input id="episode-title" autoFocus name="title" value={formData.title} onChange={handleChange} />
+        </FormField>
+        <FormField label="Episode Number" htmlFor="episode-number">
+          <Input
+            id="episode-number"
             name="episode_number"
-            label="Episode Number"
             type="number"
-            fullWidth
             value={formData.episode_number || ""}
             onChange={handleChange}
           />
-          <VideoUploader
-            label="Episode Video"
-            status={uploader.status}
-            progress={uploader.progress}
-            error={uploader.error}
-            finalUrl={formData.file_url}
-            onUpload={uploader.uploadFile}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit}>Save</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        </FormField>
+        <VideoUploader
+          label="Episode Video"
+          status={uploader.status}
+          progress={uploader.progress}
+          error={uploader.error}
+          finalUrl={formData.file_url}
+          onUpload={uploader.uploadFile}
+        />
+      </FormDialog>
+    </PageShell>
   );
 }

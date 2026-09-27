@@ -2,27 +2,26 @@ import type { ChangeEvent } from "react";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
-import Table from "@mui/material/Table";
-import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import TableRow from "@mui/material/TableRow";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import TableContainer from "@mui/material/TableContainer";
-import TablePagination from "@mui/material/TablePagination";
 import { useParams } from "next/navigation";
+import { PlusIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { FormDialog } from "@/components/form-dialog";
+import { FormField } from "@/components/form-field";
+import { DataTablePagination } from "@/components/data-table-pagination";
+import { PageHeader, PageShell } from "@/components/page-shell";
 
 import apiClient from "src/services/api";
-
-import { useAuth } from "src/features/auth/context";
 
 interface Season {
   id: string;
@@ -31,7 +30,6 @@ interface Season {
 }
 
 export function SeasonListView() {
-  const { user } = useAuth()!;
   const { contentId } = useParams();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [open, setOpen] = useState(false);
@@ -79,17 +77,8 @@ export function SeasonListView() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleChangePage = (
-    event: React.MouseEvent<HTMLButtonElement> | null,
-    newPage: number
-  ) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+  const handleChangeRowsPerPage = (value: number) => {
+    setRowsPerPage(value);
     setPage(0);
   };
 
@@ -117,104 +106,99 @@ export function SeasonListView() {
     }
   };
 
-  return (
-    <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Typography variant="h4">Seasons</Typography>
+  const rows = seasons.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => handleOpen()}
-        >
-          Create Season
-        </Button>
-      </Box>
-      <TableContainer component={Card}>
+  return (
+    <PageShell>
+      <PageHeader
+        title="Seasons"
+        description="Seasons of this series. Open one to manage its episodes."
+        actions={
+          <Button onClick={() => handleOpen()}>
+            <PlusIcon />
+            Create Season
+          </Button>
+        }
+      />
+      <Card className="gap-0 py-0">
         <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Title</TableCell>
-              <TableCell>Season Number</TableCell>
-              <TableCell>Actions</TableCell>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="pl-4">Title</TableHead>
+              <TableHead>Season Number</TableHead>
+              <TableHead className="pr-4 text-right">Actions</TableHead>
             </TableRow>
-          </TableHead>
+          </TableHeader>
           <TableBody>
-            {seasons
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((item) => (
+            {rows.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                  No seasons yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>{item.title}</TableCell>
-                  <TableCell>{item.season_number}</TableCell>
-                  <TableCell>
-                    <Button size="small" onClick={() => handleOpen(item)}>
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      Delete
-                    </Button>
-                    <Button
-                      size="small"
-                      component={Link}
-                      href={`/season/${item.id}/episodes`}
-                    >
-                      Manage Episodes
-                    </Button>
+                  <TableCell className="pl-4 font-medium">{item.title}</TableCell>
+                  <TableCell className="tabular-nums">{item.season_number}</TableCell>
+                  <TableCell className="pr-4">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpen(item)}>
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(item.id)}>
+                        Delete
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link href={`/season/${item.id}/episodes`} />}
+                      >
+                        Manage Episodes
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+            )}
           </TableBody>
         </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
+        <DataTablePagination
           count={seasons.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
+          onPageChange={setPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-      </TableContainer>
+      </Card>
 
-      <Dialog open={open} onClose={handleClose}>
-        <DialogTitle>{editItem ? "Edit Season" : "Create Season"}</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            name="title"
-            label="Title"
-            type="text"
-            fullWidth
-            value={formData.title}
-            onChange={handleChange}
-          />
-          <TextField
-            margin="dense"
+      <FormDialog
+        open={open}
+        onClose={handleClose}
+        title={editItem ? "Edit Season" : "Create Season"}
+        footer={
+          <>
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit}>Save</Button>
+          </>
+        }
+      >
+        <FormField label="Title" htmlFor="season-title">
+          <Input id="season-title" autoFocus name="title" value={formData.title} onChange={handleChange} />
+        </FormField>
+        <FormField label="Season Number" htmlFor="season-number">
+          <Input
+            id="season-number"
             name="season_number"
-            label="Season Number"
             type="number"
-            fullWidth
             value={formData.season_number || ""}
             onChange={handleChange}
           />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit}>Save</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        </FormField>
+      </FormDialog>
+    </PageShell>
   );
 }
