@@ -6,13 +6,10 @@ import duration from "dayjs/plugin/duration";
 import { useMediaUpload } from "@/hooks/use-media-upload";
 import { VideoUploader } from "@/components/video-uploader";
 import { ImageUploader } from "@/components/image-uploader";
-import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FormDialog } from "@/components/form-dialog";
+import { FormField } from "@/components/form-field";
 
 import { miniseriesEpisodeService } from "src/services/miniseriesEpisodeService";
 
@@ -87,64 +84,66 @@ export function MiniseriesEpisodeForm({ open, onClose, item: editItem, contentId
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>
-        {editItem ? "Edit Episode" : "Create Episode"}
-      </DialogTitle>
-      <DialogContent>
-        <TextField
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      title={editItem ? "Edit Episode" : "Create Episode"}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit}>Save</Button>
+        </>
+      }
+    >
+      <FormField label="Title" htmlFor="miniseries-episode-title">
+        <Input
+          id="miniseries-episode-title"
           autoFocus
-          margin="dense"
           name="title"
-          label="Title"
-          type="text"
-          fullWidth
           value={formData.title}
           onChange={handleChange}
         />
-        <TextField
-          margin="dense"
+      </FormField>
+      <FormField label="Episode Number" htmlFor="miniseries-episode-number">
+        <Input
+          id="miniseries-episode-number"
           name="miniseries_no"
-          label="Episode Number"
           type="number"
-          fullWidth
           value={formData.miniseries_no}
           onChange={handleChange}
         />
-        <VideoUploader
-          label="Streaming Video"
-          status={uploader.status}
-          progress={uploader.progress}
-          error={uploader.error}
-          finalUrl={formData.streaming_link}
-          onUpload={uploader.uploadFile}
-        />
-        <ImageUploader
-          label="Thumbnail URL"
-          value={formData.thumbnail}
-          onUpload={(url) => setFormData({ ...formData, thumbnail: url })}
-        />
-        <TextField
-          margin="dense"
+      </FormField>
+      <VideoUploader
+        label="Streaming Video"
+        status={uploader.status}
+        progress={uploader.progress}
+        error={uploader.error}
+        finalUrl={formData.streaming_link}
+        onUpload={uploader.uploadFile}
+      />
+      <ImageUploader
+        label="Thumbnail URL"
+        value={formData.thumbnail}
+        onUpload={(url) => setFormData({ ...formData, thumbnail: url })}
+      />
+      <FormField
+        label="Duration (in seconds)"
+        htmlFor="miniseries-episode-duration"
+        hint={
+          formData.duration && !isNaN(Number(formData.duration))
+            ? dayjs.duration(Number(formData.duration), "seconds").format("HH:mm:ss")
+            : undefined
+        }
+      >
+        <Input
+          id="miniseries-episode-duration"
           name="duration"
-          label="Duration (in seconds)"
-          type="text"
-          fullWidth
-          value={formData.duration}
+          value={formData.duration ?? ""}
           onChange={handleChange}
         />
-        <Typography variant="caption">
-          {formData.duration && !isNaN(Number(formData.duration))
-            ? dayjs
-                .duration(Number(formData.duration), "seconds")
-                .format("HH:mm:ss")
-            : ""}
-        </Typography>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSubmit}>Save</Button>
-      </DialogActions>
-    </Dialog>
+      </FormField>
+    </FormDialog>
   );
 }

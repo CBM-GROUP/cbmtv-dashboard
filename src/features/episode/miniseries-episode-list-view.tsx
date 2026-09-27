@@ -1,24 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
+import { PlusIcon } from "lucide-react";
 
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-
-import Typography from "@mui/material/Typography";
-import TablePagination from "@mui/material/TablePagination";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DataTablePagination } from "@/components/data-table-pagination";
+import { PageHeader, PageShell } from "@/components/page-shell";
 
 import { formatDuration } from "src/utils/format-time";
-import { useAuth } from "src/features/auth/context";
 import { miniseriesEpisodeService } from "src/services/miniseriesEpisodeService";
 
 import { MiniseriesEpisodeForm } from "./miniseries-episode-form";
@@ -35,24 +34,14 @@ interface MiniseriesEpisodeListViewProps {
 export function MiniseriesEpisodeListView({
   contentId,
 }: MiniseriesEpisodeListViewProps) {
-  const { user } = useAuth()!;
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Episode | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
-  const handleChangePage = (
-    event: React.MouseEvent<HTMLButtonElement> | null,
-    newPage: number
-  ) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+  const handleChangeRowsPerPage = (value: number) => {
+    setRowsPerPage(value);
     setPage(0);
   };
 
@@ -95,75 +84,71 @@ export function MiniseriesEpisodeListView({
     }
   };
 
+  const rows = episodes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Typography variant="h4">Miniseries Episodes</Typography>
+    <PageShell>
+      <PageHeader
+        title="Miniseries Episodes"
+        description="Episodes that make up this miniseries."
+        actions={
+          <Button onClick={() => handleOpen()}>
+            <PlusIcon />
+            Create Episode
+          </Button>
+        }
+      />
 
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => handleOpen()}
-        >
-          Create Episode
-        </Button>
-      </Box>
-
-      <TableContainer component={Card}>
+      <Card className="gap-0 py-0">
         <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Thumbnail</TableCell>
-              <TableCell>Title</TableCell>
-              <TableCell>Episode Number</TableCell>
-              <TableCell>Duration</TableCell>
-              <TableCell>Actions</TableCell>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-24 pl-4">Thumbnail</TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead>Episode Number</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead className="pr-4 text-right">Actions</TableHead>
             </TableRow>
-          </TableHead>
+          </TableHeader>
           <TableBody>
-            {episodes
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((item) => (
+            {rows.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  No episodes yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>
+                  <TableCell className="pl-4">
                     <RemoteThumbnail src={item.thumbnail} label={item.title} />
                   </TableCell>
-                  <TableCell>{item.title}</TableCell>
-                  <TableCell>{item.miniseries_no}</TableCell>
-                  <TableCell>{formatDuration(item.duration)}</TableCell>
-                  <TableCell>
-                    <Button size="small" onClick={() => handleOpen(item)}>
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      Delete
-                    </Button>
+                  <TableCell className="font-medium">{item.title}</TableCell>
+                  <TableCell className="tabular-nums">{item.miniseries_no}</TableCell>
+                  <TableCell className="tabular-nums">{formatDuration(item.duration)}</TableCell>
+                  <TableCell className="pr-4">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpen(item)}>
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(item.id)}>
+                        Delete
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+            )}
           </TableBody>
         </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
+        <DataTablePagination
           count={episodes.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
+          onPageChange={setPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-      </TableContainer>
+      </Card>
 
       <MiniseriesEpisodeForm
         open={open}
@@ -172,6 +157,6 @@ export function MiniseriesEpisodeListView({
         contentId={contentId}
         onSave={handleSave}
       />
-    </Box>
+    </PageShell>
   );
 }
