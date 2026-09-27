@@ -1,8 +1,6 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-import Box from "@mui/material/Box";
-
 function isHttpUrl(value: string | null | undefined) {
   if (!value) return false;
   try {
@@ -37,7 +35,7 @@ export function RemoteThumbnail({
   label,
   width = 80,
   height = 45,
-  borderRadius = 4,
+  borderRadius = 6,
 }: RemoteThumbnailProps) {
   const [failed, setFailed] = useState(false);
 
@@ -47,23 +45,13 @@ export function RemoteThumbnail({
 
   if (!isHttpUrl(src) || failed) {
     return (
-      <Box
+      <div
         aria-label={src ? `Image unavailable for ${label}` : `No image for ${label}`}
-        sx={{
-          width,
-          height,
-          borderRadius: borderRadius / 4,
-          bgcolor: "action.hover",
-          color: "text.secondary",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          textAlign: "center",
-        }}
+        className="flex shrink-0 items-center justify-center bg-muted text-center text-[11px] text-muted-foreground ring-1 ring-foreground/5"
+        style={{ width, height, borderRadius }}
       >
         No image
-      </Box>
+      </div>
     );
   }
 
@@ -75,7 +63,8 @@ export function RemoteThumbnail({
       height={height}
       unoptimized
       onError={() => setFailed(true)}
-      style={{ width, height, borderRadius, objectFit: "cover" }}
+      className="shrink-0 object-cover ring-1 ring-foreground/5"
+      style={{ width, height, borderRadius }}
     />
   );
 }
