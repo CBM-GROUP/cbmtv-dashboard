@@ -1,20 +1,21 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { PlusIcon, SearchIcon } from 'lucide-react';
 
-import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import Button from '@mui/material/Button';
-
-import TextField from '@mui/material/TextField';
-
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import TablePagination from '@mui/material/TablePagination';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { StatusAlert } from '@/components/form-field';
+import { DataTablePagination } from '@/components/data-table-pagination';
+import { PageHeader, PageShell, PageToolbar } from '@/components/page-shell';
 
 import { useAuth } from 'src/features/auth/context';
 import { channelService } from 'src/services/channelService';
@@ -36,14 +37,8 @@ export function ChannelListView() {
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChangePage = (event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+  const handleChangeRowsPerPage = (value: number) => {
+    setRowsPerPage(value);
     setPage(0);
   };
 
@@ -92,53 +87,55 @@ export function ChannelListView() {
     }
   };
 
+  const rows = channels
+    .filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mb: 3,
-        }}
-      >
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          {/*<Typography variant="h4">Channels</Typography>*/}
-          <TextField
-            label="Search Channels"
-            variant="outlined"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ minWidth: 240 }}
-          />
-        </Box>
-        
-          <Button variant="contained" color="primary" onClick={() => handleOpen()}>
+    <PageShell>
+      <PageHeader
+        title="Channels"
+        description="Channels group content in the CBM TV catalogue."
+        actions={
+          <Button onClick={() => handleOpen()}>
+            <PlusIcon />
             Create Channel
           </Button>
-        
-      </Box>
-      {error && (
-        <Alert severity="error" sx={{ mb: 3, whiteSpace: 'pre-line' }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-      <TableContainer component={Card}>
+        }
+      />
+      <PageToolbar>
+        <div className="relative w-full sm:w-64">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="Search Channels"
+            placeholder="Search channels..."
+            className="pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </PageToolbar>
+      {error && <StatusAlert onDismiss={() => setError(null)}>{error}</StatusAlert>}
+      <Card className="gap-0 py-0">
         <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Logo</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Actions</TableCell>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-20 pl-4">Logo</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead className="pr-4 text-right">Actions</TableHead>
             </TableRow>
-          </TableHead>
+          </TableHeader>
           <TableBody>
-            {channels
-              .filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((item) => (
+            {rows.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                  No channels found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>
+                  <TableCell className="pl-4">
                     <RemoteThumbnail
                       src={item.cover_image_url}
                       label={item.name}
@@ -147,42 +144,40 @@ export function ChannelListView() {
                       borderRadius={8}
                     />
                   </TableCell>
-                  <TableCell>{item.name}</TableCell>
-                  <TableCell>
-                    
-                      <>
-                        <Button size="small" onClick={() => handleOpen(item)}>
-                          Edit
-                        </Button>
-                        <Button size="small" color="error" onClick={() => handleDelete(item.id)}>
-                          Delete
-                        </Button>
-                        <Button
-                          size="small"
-                          component={Link}
-                          href={`/content-list?channel=${item.id}`}
-                        >
-                          View
-                        </Button>
-                      </>
-                    
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="pr-4">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpen(item)}>
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(item.id)}>
+                        Delete
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link href={`/content-list?channel=${item.id}`} />}
+                      >
+                        View
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+            )}
           </TableBody>
         </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
+        <DataTablePagination
           count={channels.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
+          onPageChange={setPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-      </TableContainer>
+      </Card>
 
       <ChannelForm open={open} onClose={handleClose} item={editItem} onSave={handleSave} />
-    </Box>
+    </PageShell>
   );
 }
