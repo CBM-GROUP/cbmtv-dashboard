@@ -46,6 +46,8 @@ export interface Advert {
   advert_link: string;
   stream_link: string;
   advert_thumbnail: string;
+  show_in_hero?: boolean;
+  hero_order?: number;
 }
 
 export interface Episode {

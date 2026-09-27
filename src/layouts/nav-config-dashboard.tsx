@@ -1,6 +1,6 @@
 import { MdDashboard } from 'react-icons/md';
 import { BiSolidVideos } from 'react-icons/bi';
-import { BsPersonFill, BsDisplayFill, BsMegaphoneFill, BsFillPeopleFill } from 'react-icons/bs';
+import { BsPersonFill, BsDisplayFill, BsMegaphoneFill, BsFillPeopleFill, BsGearFill } from 'react-icons/bs';
 
 export type NavItem = {
   title: string;
@@ -31,6 +31,12 @@ export const navData = [
     title: 'Adverts',
     path: '/advert-list',
     icon: <BsMegaphoneFill />,
+  },
+  {
+    title: 'Hero Settings',
+    path: '/hero-settings',
+    icon: <BsGearFill />,
+    adminOnly: true,
   },
   {
     title: 'User Management',
