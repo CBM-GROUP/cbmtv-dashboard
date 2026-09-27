@@ -1,14 +1,11 @@
 import type { ChangeEvent } from 'react';
 import { useEffect, useState } from 'react';
 
-
-import Alert from '@mui/material/Alert';
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { FormDialog } from '@/components/form-dialog';
+import { FormField, StatusAlert } from '@/components/form-field';
 
 import { channelService } from 'src/services/channelService';
 import { getApiErrorMessage } from 'src/services/apiError';
@@ -79,54 +76,44 @@ export function ChannelForm({ open, onClose, item: editItem, onSave }: ChannelFo
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>{editItem ? 'Edit Channel' : 'Create Channel'}</DialogTitle>
-      <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
-            {error}
-          </Alert>
-        )}
-        <TextField
-          autoFocus
-          margin="dense"
-          name="name"
-          label="Name"
-          type="text"
-          fullWidth
-          value={formData.name}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      title={editItem ? 'Edit Channel' : 'Create Channel'}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={saving || !formData.name.trim()}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </>
+      }
+    >
+      {error && <StatusAlert>{error}</StatusAlert>}
+      <FormField label="Name" htmlFor="channel-name">
+        <Input id="channel-name" autoFocus name="name" value={formData.name} onChange={handleChange} />
+      </FormField>
+      <FormField label="Description" htmlFor="channel-description">
+        <Textarea
+          id="channel-description"
           name="description"
-          label="Description"
-          type="text"
-          fullWidth
-          multiline
-          minRows={2}
+          rows={2}
           value={formData.description}
           onChange={handleChange}
         />
-        <ImageUploader
-          label="Logo URL"
-          value={formData.logo_url}
-          onUpload={(url) => setFormData({ ...formData, logo_url: url })}
-        />
-        <ImageUploader
-          label="Cover Image URL"
-          value={formData.cover_image_url}
-          onUpload={(url) => setFormData({ ...formData, cover_image_url: url })}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={saving}>
-          Cancel
-        </Button>
-        <Button onClick={handleSubmit} disabled={saving || !formData.name.trim()}>
-          {saving ? 'Saving...' : 'Save'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      </FormField>
+      <ImageUploader
+        label="Logo URL"
+        value={formData.logo_url}
+        onUpload={(url) => setFormData({ ...formData, logo_url: url })}
+      />
+      <ImageUploader
+        label="Cover Image URL"
+        value={formData.cover_image_url}
+        onUpload={(url) => setFormData({ ...formData, cover_image_url: url })}
+      />
+    </FormDialog>
   );
 }

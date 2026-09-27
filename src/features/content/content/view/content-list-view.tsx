@@ -3,31 +3,40 @@ import duration from "dayjs/plugin/duration";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
-import Tab from "@mui/material/Tab";
-import Tooltip from "@mui/material/Tooltip";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TablePagination from "@mui/material/TablePagination";
-import TableRow from "@mui/material/TableRow";
-import Tabs from "@mui/material/Tabs";
-import TextField from "@mui/material/TextField";
-import Dialog from "@mui/material/Dialog";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogActions from "@mui/material/DialogActions";
-import Alert from "@mui/material/Alert";
+import { PlayIcon, PlusIcon, SearchIcon } from "lucide-react";
 import MuxPlayer from "@mux/mux-player-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { StatusAlert } from "@/components/form-field";
+import { DataTablePagination } from "@/components/data-table-pagination";
+import { PageHeader, PageShell, PageToolbar } from "@/components/page-shell";
 
 import { ContentForm } from "./content-form";
 
@@ -40,6 +49,19 @@ import { useUploadManager } from "@/components/upload/upload-manager";
 import { Channel, Content } from "@/types";
 
 dayjs.extend(duration);
+
+/** Sentinel for the "All" channel option; Base UI reserves null for "no selection". */
+const ALL_CHANNELS = "all";
+
+const TABS = [
+  { value: "movies", label: "Movies" },
+  { value: "series", label: "Series" },
+  { value: "miniseries", label: "Miniseries" },
+  { value: "music", label: "Music" },
+  { value: "animations", label: "Animations" },
+  { value: "documentary", label: "Documentary" },
+  { value: "original", label: "Original" },
+];
 
 function isPlayableUrl(value: string | null | undefined): value is string {
   // Empty/null is the common case for a row whose video has not been uploaded
@@ -65,7 +87,8 @@ function isPlayableUrl(value: string | null | undefined): value is string {
 function PlayAction({ item, onPlay }: { item: Content; onPlay: () => void }) {
   if (isPlayableUrl(item.streaming_link)) {
     return (
-      <Button size="small" onClick={onPlay}>
+      <Button variant="outline" size="sm" onClick={onPlay}>
+        <PlayIcon />
         Play
       </Button>
     );
@@ -75,19 +98,19 @@ function PlayAction({ item, onPlay }: { item: Content; onPlay: () => void }) {
     item.content_type === "series" || item.content_type === "miniseries";
 
   return (
-    <Tooltip
-      title={
-        isContainer
-          ? "A series has no video of its own — open its episodes to play them"
-          : "No video uploaded for this item yet"
-      }
-    >
-      {/* MUI needs a wrapper: a disabled button emits no pointer events. */}
-      <span>
-        <Button size="small" disabled>
+    <Tooltip>
+      {/* A disabled button emits no pointer events, so the span carries the tooltip. */}
+      <TooltipTrigger render={<span tabIndex={0} className="inline-flex rounded-lg" />}>
+        <Button variant="outline" size="sm" disabled>
+          <PlayIcon />
           Play
         </Button>
-      </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {isContainer
+          ? "A series has no video of its own — open its episodes to play them"
+          : "No video uploaded for this item yet"}
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -112,17 +135,8 @@ export function ContentListView() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
-  const handleChangePage = (
-    event: React.MouseEvent<HTMLButtonElement> | null,
-    newPage: number,
-  ) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+  const handleChangeRowsPerPage = (value: number) => {
+    setRowsPerPage(value);
     setPage(0);
   };
 
@@ -170,7 +184,7 @@ export function ContentListView() {
     setEditItem(null);
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
+  const handleTabChange = (newValue: string) => {
     setTab(newValue);
   };
 
@@ -197,114 +211,138 @@ export function ContentListView() {
     setPlaybackError("");
   };
 
+  const channelItems = [
+    { value: ALL_CHANNELS, label: "All" },
+    ...channels.map((channel) => ({ value: String(channel.id), label: channel.name })),
+  ];
+
+  const rows = content
+    .filter((item) => {
+      if (tab === "movies") return item.content_type === "movie";
+      if (tab === "series") return item.content_type === "series";
+      if (tab === "miniseries")
+        return item.content_type === "miniseries";
+      if (tab === "music") return item.content_type === "music";
+      return false;
+    })
+    .filter((item) =>
+      channelId ? String(item.channel) === channelId : true,
+    )
+    .filter((item) =>
+      item.title.toLowerCase().includes(searchQuery.toLowerCase()),
+    )
+    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-          <FormControl sx={{ minWidth: 240 }}>
-            <InputLabel>Channel</InputLabel>
-            <Select
-              value={channelId || ""}
-              onChange={(e) => {
-                const newChannelId = e.target.value;
-                const params = new URLSearchParams(searchParams);
-                if (newChannelId) {
-                  params.set("channel", newChannelId);
-                } else {
-                  params.delete("channel");
-                }
-                router.push(`${pathname}?${params.toString()}`);
-              }}
-            >
-              <MenuItem value="">All</MenuItem>
-              {channels.map((channel) => (
-                <MenuItem key={channel.id} value={String(channel.id)}>
-                  {channel.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Search Content"
-            variant="outlined"
+    <PageShell>
+      <PageHeader
+        title="Content"
+        description="Movies, series and other titles available to stream."
+        actions={
+          <Button onClick={() => handleOpen()}>
+            <PlusIcon />
+            Create Content
+          </Button>
+        }
+      />
+      <PageToolbar>
+        <Select
+          items={channelItems}
+          value={channelId || ALL_CHANNELS}
+          onValueChange={(newChannelId) => {
+            const params = new URLSearchParams(searchParams);
+            if (newChannelId && newChannelId !== ALL_CHANNELS) {
+              params.set("channel", newChannelId);
+            } else {
+              params.delete("channel");
+            }
+            router.push(`${pathname}?${params.toString()}`);
+          }}
+        >
+          <SelectTrigger aria-label="Channel" className="w-full sm:w-56">
+            <span className="text-muted-foreground">Channel:</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {channelItems.map((channel) => (
+              <SelectItem key={channel.value} value={channel.value}>
+                {channel.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="relative w-full sm:w-64">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="Search Content"
+            placeholder="Search content..."
+            className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ minWidth: 240 }}
           />
-        </Box>
+        </div>
+      </PageToolbar>
 
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => handleOpen()}
-        >
-          Create Content
-        </Button>
-      </Box>
+      <Tabs value={tab} onValueChange={(value) => handleTabChange(String(value))}>
+        {/* Seven tabs overflow a phone screen; let the strip scroll instead of the page. */}
+        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+          <TabsList>
+            {TABS.map((item) => (
+              <TabsTrigger key={item.value} value={item.value} className="px-3">
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+      </Tabs>
 
-      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={tab} onChange={handleTabChange}>
-          <Tab label="Movies" value="movies" />
-          <Tab label="Series" value="series" />
-          <Tab label="Miniseries" value="miniseries" />
-          <Tab label="Music" value="music" />
-          <Tab label="Animations" value="animations" />
-          <Tab label="Documentary" value="documentary" />
-          <Tab label="Original" value="original" />
-        </Tabs>
-      </Box>
-
-      <TableContainer component={Card}>
+      <Card className="gap-0 py-0">
         <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Thumbnail</TableCell>
-              <TableCell>Title</TableCell>
-              <TableCell>Content Type</TableCell>
-              <TableCell>Channel</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Actions</TableCell>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-24 pl-4">Thumbnail</TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead>Content Type</TableHead>
+              <TableHead>Channel</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="pr-4 text-right">Actions</TableHead>
             </TableRow>
-          </TableHead>
+          </TableHeader>
           <TableBody>
-            {content
-              .filter((item) => {
-                if (tab === "movies") return item.content_type === "movie";
-                if (tab === "series") return item.content_type === "series";
-                if (tab === "miniseries")
-                  return item.content_type === "miniseries";
-                if (tab === "music") return item.content_type === "music";
-                return false;
-              })
-              .filter((item) =>
-                channelId ? String(item.channel) === channelId : true,
-              )
-              .filter((item) =>
-                item.title.toLowerCase().includes(searchQuery.toLowerCase()),
-              )
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((item) => (
+            {rows.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  No content found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>
+                  <TableCell className="pl-4">
                     <RemoteThumbnail src={item.thumbnail} label={item.title} />
                   </TableCell>
-                  <TableCell>{item.title}</TableCell>
-                  <TableCell>{item.content_type}</TableCell>
+                  <TableCell className="font-medium">{item.title}</TableCell>
+                  <TableCell className="capitalize">{item.content_type}</TableCell>
                   <TableCell>
                     {channels.find((c) => String(c.id) === String(item.channel))
                       ?.name || "—"}
                   </TableCell>
-                  <TableCell>{item.status}</TableCell>
                   <TableCell>
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                      <Button size="small" onClick={() => handleOpen(item)}>
+                    <Badge
+                      variant={
+                        item.status === "rejected"
+                          ? "destructive"
+                          : item.status === "approved"
+                            ? "default"
+                            : "secondary"
+                      }
+                    >
+                      {item.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="pr-4">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpen(item)}>
                         Edit
                       </Button>
                       <PlayAction
@@ -315,46 +353,47 @@ export function ContentListView() {
                         }}
                       />
                       <Button
-                        size="small"
-                        color="error"
+                        variant="destructive"
+                        size="sm"
                         onClick={() => handleDelete(item.id)}
                       >
                         Delete
                       </Button>
                       {item.content_type === "series" && (
                         <Button
-                          size="small"
-                          component={Link}
-                          href={`/content/${item.id}/seasons`}
+                          variant="outline"
+                          size="sm"
+                          nativeButton={false}
+                          render={<Link href={`/content/${item.id}/seasons`} />}
                         >
                           Seasons
                         </Button>
                       )}
                       {item.content_type === "miniseries" && (
                         <Button
-                          size="small"
-                          component={Link}
-                          href={`/content/${item.id}/miniseries-episodes`}
+                          variant="outline"
+                          size="sm"
+                          nativeButton={false}
+                          render={<Link href={`/content/${item.id}/miniseries-episodes`} />}
                         >
                           Episodes
                         </Button>
                       )}
-                    </Box>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+            )}
           </TableBody>
         </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
+        <DataTablePagination
           count={content.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
+          onPageChange={setPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-      </TableContainer>
+      </Card>
 
       <ContentForm
         open={open}
@@ -363,14 +402,12 @@ export function ContentListView() {
         channels={channels}
         onSave={handleSave}
       />
-      <Dialog open={Boolean(playingContent)} onClose={handleClosePlayer} fullWidth maxWidth="md">
-        <DialogTitle>{playingContent?.title || "Video playback"}</DialogTitle>
-        <DialogContent>
-          {playbackError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {playbackError}
-            </Alert>
-          )}
+      <Dialog open={Boolean(playingContent)} onOpenChange={(next) => !next && handleClosePlayer()}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader className="pr-8">
+            <DialogTitle>{playingContent?.title || "Video playback"}</DialogTitle>
+          </DialogHeader>
+          {playbackError && <StatusAlert>{playbackError}</StatusAlert>}
           {playingContent?.streaming_link?.includes("mux.com") ? (
             <MuxPlayer
               key={playingContent.streaming_link}
@@ -387,16 +424,18 @@ export function ContentListView() {
               controls
               autoPlay
               onError={() => setPlaybackError("This video could not be played.")}
-              style={{ width: "100%", maxHeight: "70vh", backgroundColor: "black" }}
+              className="max-h-[70vh] w-full rounded-lg bg-black"
             >
               Your browser does not support video playback.
             </video>
           ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClosePlayer}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClosePlayer}>Close</Button>
-        </DialogActions>
       </Dialog>
-    </Box>
+    </PageShell>
   );
 }
