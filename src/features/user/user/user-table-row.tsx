@@ -1,8 +1,7 @@
-import Box from '@mui/material/Box';
-import Avatar from '@mui/material/Avatar';
-import Button from '@mui/material/Button';
-import TableRow from '@mui/material/TableRow';
-import TableCell from '@mui/material/TableCell';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { TableCell, TableRow } from '@/components/ui/table';
 
 // ----------------------------------------------------------------------
 
@@ -30,40 +29,33 @@ type UserTableRowProps = {
 
 export function UserTableRow({ row, onAssignAdmin, onDemoteAdmin }: UserTableRowProps) {
   return (
-    <TableRow hover tabIndex={-1}>
-      <TableCell component="th" scope="row">
-        <Box
-          sx={{
-            gap: 2,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <Avatar alt={row.name} src={row.avatarUrl} />
-          {row.name}
-        </Box>
+    <TableRow>
+      <TableCell className="pl-4">
+        <div className="flex items-center gap-3">
+          <Avatar>
+            {row.avatarUrl && <AvatarImage src={row.avatarUrl} alt={row.name} />}
+            <AvatarFallback>{(row.name || row.email || '?').charAt(0).toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <span className="font-medium">{row.name}</span>
+        </div>
       </TableCell>
 
-      <TableCell>{row.email}</TableCell>
+      <TableCell className="text-muted-foreground">{row.email}</TableCell>
 
-      <TableCell>{row.role}</TableCell>
+      <TableCell>
+        <Badge variant={row.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
+          {row.role}
+        </Badge>
+      </TableCell>
 
-      <TableCell align="right">
+      <TableCell className="pr-4 text-right">
         {row.role === 'admin' && (
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={onDemoteAdmin}
-          >
+          <Button variant="outline" size="sm" onClick={onDemoteAdmin}>
             Demote Admin
           </Button>
         )}
         {row.role === 'user' && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={onAssignAdmin}
-          >
+          <Button size="sm" onClick={onAssignAdmin}>
             Make Admin
           </Button>
         )}

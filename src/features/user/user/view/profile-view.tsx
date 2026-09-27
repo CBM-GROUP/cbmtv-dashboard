@@ -1,13 +1,32 @@
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import Typography from '@mui/material/Typography';
-import CardContent from '@mui/material/CardContent';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import { useAuth } from 'src/features/auth/context';
 import { useState, useEffect } from 'react';
+import { PencilIcon } from 'lucide-react';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { FormField } from '@/components/form-field';
+import { PageHeader, PageShell } from '@/components/page-shell';
+import { useAuth } from 'src/features/auth/context';
 import apiClient from 'src/services/api';
 import { ImageUploader } from 'src/components/image-uploader';
+
+const TEXT_FIELDS = [
+  { name: 'name', label: 'Name' },
+  { name: 'email', label: 'Email' },
+  { name: 'phone', label: 'Phone' },
+  { name: 'location', label: 'Location' },
+  { name: 'country', label: 'Country' },
+] as const;
 
 export function ProfileView() {
   const { user, fetchUser } = useAuth()!;
@@ -72,84 +91,84 @@ export function ProfileView() {
     }
   };
 
+  const displayName = user?.name || user?.email || 'Account';
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>
-        Profile
-      </Typography>
+    <PageShell>
+      <PageHeader title="Profile" description="Your account details." />
       {user && (
-        <Card>
-          <CardContent>
-            {isEditing ? (
-              <Box
-                component="form"
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { sm: 'repeat(2, 1fr)' },
-                  gap: 2,
-                }}
-                noValidate
-                autoComplete="off"
-              >
-                <TextField
-                  name="name"
-                  label="Name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
-                <TextField
-                  name="email"
-                  label="Email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                />
-                <TextField
-                  name="phone"
-                  label="Phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                />
-                <TextField
-                  name="location"
-                  label="Location"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                />
-                <TextField
-                  name="country"
-                  label="Country"
-                  value={formData.country}
-                  onChange={handleInputChange}
-                />
-                <ImageUploader
-                  label="Profile Image"
-                  value={formData.image}
-                  onUpload={handleImageUpload}
-                />
-                <Box sx={{ display: 'flex', gap: 2, mt: 2, gridColumn: 'span 2' }}>
-                  <Button variant="contained" onClick={handleSubmit}>
-                    Save
-                  </Button>
-                  <Button variant="outlined" onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </Button>
-                </Box>
-              </Box>
-            ) : (
-              <>
-                <Typography variant="h6">Name: {user.name}</Typography>
-                <Typography>Email: {user.email}</Typography>
-                <Typography>Phone: {user.phone}</Typography>
-                <Typography>Location: {user.location}</Typography>
-                <Typography>Country: {user.country}</Typography>
-                <Button variant="contained" sx={{ mt: 2 }} onClick={() => setIsEditing(true)}>
+        <Card className="max-w-3xl">
+          <CardHeader className="border-b">
+            <div className="flex flex-wrap items-center gap-4">
+              <Avatar size="lg">
+                {user.image && <AvatarImage src={user.image} alt={displayName} />}
+                <AvatarFallback>{displayName.charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="grid min-w-0 flex-1 gap-1">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="truncate">{user.name || 'Unnamed user'}</span>
+                  {user.role && (
+                    <Badge variant="secondary" className="capitalize">
+                      {user.role}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription className="truncate">{user.email}</CardDescription>
+              </div>
+              {!isEditing && (
+                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                  <PencilIcon />
                   Edit Profile
                 </Button>
-              </>
-            )}
-          </CardContent>
+              )}
+            </div>
+          </CardHeader>
+
+          {isEditing ? (
+            <>
+              <CardContent>
+                <form className="grid gap-4 sm:grid-cols-2" noValidate autoComplete="off">
+                  {TEXT_FIELDS.map((field) => (
+                    <FormField key={field.name} label={field.label} htmlFor={`profile-${field.name}`}>
+                      <Input
+                        id={`profile-${field.name}`}
+                        name={field.name}
+                        value={formData[field.name]}
+                        onChange={handleInputChange}
+                      />
+                    </FormField>
+                  ))}
+                  <div className="sm:col-span-2">
+                    <ImageUploader
+                      label="Profile Image"
+                      value={formData.image}
+                      onUpload={handleImageUpload}
+                    />
+                  </div>
+                </form>
+              </CardContent>
+              <CardFooter className="justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSubmit}>Save</Button>
+              </CardFooter>
+            </>
+          ) : (
+            <CardContent>
+              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                {TEXT_FIELDS.map((field, index) => (
+                  <div key={field.name} className="grid gap-1">
+                    {index > 0 && <Separator className="mb-3 sm:hidden" />}
+                    <dt className="text-xs font-medium text-muted-foreground">{field.label}</dt>
+                    <dd className="truncate">{user[field.name] || '—'}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardContent>
+          )}
         </Card>
       )}
-    </Box>
+    </PageShell>
   );
 }

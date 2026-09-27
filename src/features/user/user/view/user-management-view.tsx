@@ -1,17 +1,11 @@
-import type { MouseEvent, ChangeEvent } from 'react';
-
 import { useState, useEffect } from 'react';
 
-import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableContainer from '@mui/material/TableContainer';
-import TablePagination from '@mui/material/TablePagination';
+import { Card } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { DataTablePagination } from '@/components/data-table-pagination';
+import { PageHeader, PageShell } from '@/components/page-shell';
 
 import apiClient from 'src/services/api';
-
-import { Scrollbar } from 'src/components/scrollbar';
 
 import { useAuth } from 'src/features/auth/context';
 
@@ -61,61 +55,62 @@ export function UserManagementView() {
     }
   };
 
-  const handleChangePage = (event: MouseEvent<HTMLButtonElement> | null, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+  const handleChangeRowsPerPage = (value: number) => {
+    setRowsPerPage(value);
     setPage(0);
   };
 
-  return (
-    <Box sx={{ p: 3 }}>
-      <Card>
-        <Scrollbar>
-          <TableContainer sx={{ overflow: 'unset' }}>
-            <Table sx={{ minWidth: 800 }}>
-              <UserTableHead
-                order="asc"
-                orderBy="name"
-                rowCount={users.length}
-                numSelected={0}
-                onSort={() => {}}
-                onSelectAllRows={() => {}}
-                headLabel={[
-                  { id: 'name', label: 'Name' },
-                  { id: 'email', label: 'Email' },
-                  { id: 'role', label: 'Role' },
-                  { id: '', label: '' },
-                ]}
-              />
-              <TableBody>
-                {users.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => (
-                  <UserTableRow
-                    key={row.id}
-                    row={row}
-                    selected={false}
-                    onSelectRow={() => {}}
-                    onAssignAdmin={() => handleAssignAdmin(row.id)}
-                    onDemoteAdmin={() => handleDemoteAdmin(row.id)}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Scrollbar>
+  const rows = users.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
+  return (
+    <PageShell>
+      <PageHeader title="User Management" description="Grant or revoke admin access." />
+      <Card className="gap-0 py-0">
+        <Table className="min-w-[640px]">
+          <UserTableHead
+            order="asc"
+            orderBy="name"
+            rowCount={users.length}
+            numSelected={0}
+            onSort={() => {}}
+            onSelectAllRows={() => {}}
+            headLabel={[
+              { id: 'name', label: 'Name' },
+              { id: 'email', label: 'Email' },
+              { id: 'role', label: 'Role' },
+              { id: '', label: '' },
+            ]}
+          />
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                  No users found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row) => (
+                <UserTableRow
+                  key={row.id}
+                  row={row}
+                  selected={false}
+                  onSelectRow={() => {}}
+                  onAssignAdmin={() => handleAssignAdmin(row.id)}
+                  onDemoteAdmin={() => handleDemoteAdmin(row.id)}
+                />
+              ))
+            )}
+          </TableBody>
+        </Table>
+
+        <DataTablePagination
           count={users.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
+          onPageChange={setPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Card>
-    </Box>
+    </PageShell>
   );
 }
