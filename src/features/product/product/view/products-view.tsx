@@ -1,12 +1,9 @@
 import { useState, useCallback } from 'react';
 
-import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
-import Pagination from '@mui/material/Pagination';
-import Typography from '@mui/material/Typography';
+import { NumberedPagination } from '@/components/numbered-pagination';
+import { PageHeader, PageShell } from '@/components/page-shell';
 
 import { _products } from 'src/_mock';
-import { DashboardContent } from 'src/layouts/dashboard';
 
 import { ProductItem } from '../product-item';
 import { ProductSort } from '../product-sort';
@@ -64,6 +61,8 @@ export function ProductsView() {
 
   const [filters, setFilters] = useState<FiltersProps>(defaultFilters);
 
+  const [page, setPage] = useState(1);
+
   const handleOpenFilter = useCallback(() => {
     setOpenFilter(true);
   }, []);
@@ -85,68 +84,51 @@ export function ProductsView() {
   );
 
   return (
-    <DashboardContent>
+    <PageShell>
       <CartIcon totalItems={8} />
 
-      <Typography variant="h4" sx={{ mb: 5 }}>
-        Products
-      </Typography>
-      <Box
-        sx={{
-          mb: 5,
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap-reverse',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <Box
-          sx={{
-            my: 1,
-            gap: 1,
-            flexShrink: 0,
-            display: 'flex',
-          }}
-        >
-          <ProductFilters
-            canReset={canReset}
-            filters={filters}
-            onSetFilters={handleSetFilters}
-            openFilter={openFilter}
-            onOpenFilter={handleOpenFilter}
-            onCloseFilter={handleCloseFilter}
-            onResetFilter={() => setFilters(defaultFilters)}
-            options={{
-              genders: GENDER_OPTIONS,
-              categories: CATEGORY_OPTIONS,
-              ratings: RATING_OPTIONS,
-              price: PRICE_OPTIONS,
-              colors: COLOR_OPTIONS,
-            }}
-          />
+      <PageHeader
+        title="Products"
+        actions={
+          <>
+            <ProductFilters
+              canReset={canReset}
+              filters={filters}
+              onSetFilters={handleSetFilters}
+              openFilter={openFilter}
+              onOpenFilter={handleOpenFilter}
+              onCloseFilter={handleCloseFilter}
+              onResetFilter={() => setFilters(defaultFilters)}
+              options={{
+                genders: GENDER_OPTIONS,
+                categories: CATEGORY_OPTIONS,
+                ratings: RATING_OPTIONS,
+                price: PRICE_OPTIONS,
+                colors: COLOR_OPTIONS,
+              }}
+            />
 
-          <ProductSort
-            sortBy={sortBy}
-            onSort={handleSort}
-            options={[
-              { value: 'featured', label: 'Featured' },
-              { value: 'newest', label: 'Newest' },
-              { value: 'priceDesc', label: 'Price: High-Low' },
-              { value: 'priceAsc', label: 'Price: Low-High' },
-            ]}
-          />
-        </Box>
-      </Box>
+            <ProductSort
+              sortBy={sortBy}
+              onSort={handleSort}
+              options={[
+                { value: 'featured', label: 'Featured' },
+                { value: 'newest', label: 'Newest' },
+                { value: 'priceDesc', label: 'Price: High-Low' },
+                { value: 'priceAsc', label: 'Price: Low-High' },
+              ]}
+            />
+          </>
+        }
+      />
 
-      <Grid container spacing={3}>
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         {_products.map((product) => (
-          <Grid key={product.id} size={{ xs: 12, sm: 6, md: 3 }}>
-            <ProductItem product={product} />
-          </Grid>
+          <ProductItem key={product.id} product={product} />
         ))}
-      </Grid>
+      </div>
 
-      <Pagination count={10} color="primary" sx={{ mt: 8, mx: 'auto' }} />
-    </DashboardContent>
+      <NumberedPagination count={10} page={page} onPageChange={setPage} className="mt-4" />
+    </PageShell>
   );
 }

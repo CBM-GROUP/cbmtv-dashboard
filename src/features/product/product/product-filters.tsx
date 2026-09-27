@@ -1,21 +1,12 @@
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import Radio from '@mui/material/Radio';
-import Badge from '@mui/material/Badge';
-import Button from '@mui/material/Button';
-import Drawer from '@mui/material/Drawer';
-import Rating from '@mui/material/Rating';
-import Divider from '@mui/material/Divider';
-import Checkbox from '@mui/material/Checkbox';
-import FormGroup from '@mui/material/FormGroup';
-import RadioGroup from '@mui/material/RadioGroup';
-import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import FormControlLabel from '@mui/material/FormControlLabel';
+import { CheckIcon, ListFilterIcon, RotateCcwIcon, StarIcon } from 'lucide-react';
 
-import { Iconify } from 'src/components/iconify';
-import { Scrollbar } from 'src/components/scrollbar';
-import { ColorPicker } from 'src/components/color-utils';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 // ----------------------------------------------------------------------
 
@@ -44,6 +35,19 @@ type ProductFiltersProps = {
   };
 };
 
+function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="grid gap-3">
+      <legend className="mb-3 text-sm font-medium">{title}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
+function ResetDot({ show }: { show: boolean }) {
+  return show ? <span className="absolute top-1 right-1 size-2 rounded-full bg-destructive" /> : null;
+}
+
 export function ProductFilters({
   filters,
   options,
@@ -55,178 +59,154 @@ export function ProductFilters({
   onResetFilter,
 }: ProductFiltersProps) {
   const renderGender = (
-    <Stack spacing={1}>
-      <Typography variant="subtitle2">Gender</Typography>
-      <FormGroup>
-        {options.genders.map((option) => (
-          <FormControlLabel
-            key={option.value}
-            control={
-              <Checkbox
-                checked={filters.gender.includes(option.value)}
-                onChange={() => {
-                  const checked = filters.gender.includes(option.value)
-                    ? filters.gender.filter((value) => value !== option.value)
-                    : [...filters.gender, option.value];
+    <FilterSection title="Gender">
+      {options.genders.map((option) => (
+        <Label key={option.value} className="font-normal">
+          <Checkbox
+            checked={filters.gender.includes(option.value)}
+            onCheckedChange={() => {
+              const checked = filters.gender.includes(option.value)
+                ? filters.gender.filter((value) => value !== option.value)
+                : [...filters.gender, option.value];
 
-                  onSetFilters({ gender: checked });
-                }}
-              />
-            }
-            label={option.label}
+              onSetFilters({ gender: checked });
+            }}
           />
-        ))}
-      </FormGroup>
-    </Stack>
+          {option.label}
+        </Label>
+      ))}
+    </FilterSection>
   );
 
   const renderCategory = (
-    <Stack spacing={1}>
-      <Typography variant="subtitle2">Category</Typography>
-      <RadioGroup>
+    <FilterSection title="Category">
+      <RadioGroup
+        value={filters.category}
+        onValueChange={(value) => onSetFilters({ category: String(value) })}
+      >
         {options.categories.map((option) => (
-          <FormControlLabel
-            key={option.value}
-            value={option.value}
-            control={
-              <Radio
-                checked={filters.category.includes(option.value)}
-                onChange={() => onSetFilters({ category: option.value })}
-              />
-            }
-            label={option.label}
-          />
+          <Label key={option.value} className="font-normal">
+            <RadioGroupItem value={option.value} />
+            {option.label}
+          </Label>
         ))}
       </RadioGroup>
-    </Stack>
+    </FilterSection>
   );
 
   const renderColors = (
-    <Stack spacing={1}>
-      <Typography variant="subtitle2">Colors</Typography>
-      <ColorPicker
-        options={options.colors}
-        value={filters.colors}
-        onChange={(colors) => onSetFilters({ colors: colors as string[] })}
-        limit={6}
-      />
-    </Stack>
+    <FilterSection title="Colors">
+      {/* Six swatches per row, matching the old ColorPicker `limit`. */}
+      <div className="grid w-fit grid-cols-6 gap-2">
+        {options.colors.map((color) => {
+          const selected = filters.colors.includes(color);
+          return (
+            <button
+              key={color}
+              type="button"
+              aria-label={color}
+              aria-pressed={selected}
+              onClick={() =>
+                onSetFilters({
+                  colors: selected
+                    ? filters.colors.filter((current) => current !== color)
+                    : [...filters.colors, color],
+                })
+              }
+              className={cn(
+                'flex size-8 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                selected && 'ring-2 ring-ring ring-offset-2 ring-offset-popover',
+              )}
+              style={{ backgroundColor: color, boxShadow: 'inset 0 0 0 1px rgb(0 0 0 / 0.12)' }}
+            >
+              {selected && <CheckIcon className="size-4 text-white mix-blend-difference" />}
+            </button>
+          );
+        })}
+      </div>
+    </FilterSection>
   );
 
   const renderPrice = (
-    <Stack spacing={1}>
-      <Typography variant="subtitle2">Price</Typography>
-      <RadioGroup>
+    <FilterSection title="Price">
+      <RadioGroup value={filters.price} onValueChange={(value) => onSetFilters({ price: String(value) })}>
         {options.price.map((option) => (
-          <FormControlLabel
-            key={option.value}
-            value={option.value}
-            control={
-              <Radio
-                checked={filters.price.includes(option.value)}
-                onChange={() => onSetFilters({ price: option.value })}
-              />
-            }
-            label={option.label}
-          />
+          <Label key={option.value} className="font-normal">
+            <RadioGroupItem value={option.value} />
+            {option.label}
+          </Label>
         ))}
       </RadioGroup>
-    </Stack>
+    </FilterSection>
   );
 
   const renderRating = (
-    <Stack spacing={1}>
-      <Typography variant="subtitle2" sx={{ mb: 2 }}>
-        Rating
-      </Typography>
-
-      {options.ratings.map((option, index) => (
-        <Box
-          key={option}
-          onClick={() => onSetFilters({ rating: option })}
-          sx={{
-            mb: 1,
-            gap: 1,
-            ml: -1,
-            p: 0.5,
-            display: 'flex',
-            borderRadius: 1,
-            cursor: 'pointer',
-            typography: 'body2',
-            alignItems: 'center',
-            '&:hover': { opacity: 0.48 },
-            ...(filters.rating === option && {
-              bgcolor: 'action.selected',
-            }),
-          }}
-        >
-          <Rating readOnly value={4 - index} /> & Up
-        </Box>
-      ))}
-    </Stack>
+    <FilterSection title="Rating">
+      <div className="-ml-1 grid gap-1">
+        {options.ratings.map((option, index) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={filters.rating === option}
+            onClick={() => onSetFilters({ rating: option })}
+            className={cn(
+              'flex items-center gap-1 rounded-md p-1 text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
+              filters.rating === option && 'bg-muted',
+            )}
+          >
+            <span className="flex" aria-label={`${4 - index} stars`}>
+              {Array.from({ length: 5 }, (_, star) => (
+                <StarIcon
+                  key={star}
+                  className={cn(
+                    'size-4',
+                    star < 4 - index ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40',
+                  )}
+                />
+              ))}
+            </span>
+            &amp; Up
+          </button>
+        ))}
+      </div>
+    </FilterSection>
   );
 
   return (
     <>
-      <Button
-        disableRipple
-        color="inherit"
-        endIcon={
-          <Badge color="error" variant="dot" invisible={!canReset}>
-            <Iconify icon="ic:round-filter-list" />
-          </Badge>
-        }
-        onClick={onOpenFilter}
-      >
+      <Button variant="ghost" onClick={onOpenFilter} className="relative">
         Filters
+        <ListFilterIcon data-icon="inline-end" />
+        <ResetDot show={canReset} />
       </Button>
 
-      <Drawer
-        anchor="right"
-        open={openFilter}
-        onClose={onCloseFilter}
-        slotProps={{
-          paper: {
-            sx: { width: 280, overflow: 'hidden' },
-          },
-        }}
-      >
-        <Box
-          sx={{
-            py: 2,
-            pl: 2.5,
-            pr: 1.5,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Filters
-          </Typography>
+      <Sheet open={openFilter} onOpenChange={(next) => (next ? onOpenFilter() : onCloseFilter())}>
+        <SheetContent side="right" className="w-72 gap-0 sm:max-w-72">
+          <SheetHeader className="flex-row items-center gap-1 pr-12">
+            <SheetTitle className="flex-1">Filters</SheetTitle>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Reset filters"
+              onClick={onResetFilter}
+              className="relative"
+            >
+              <RotateCcwIcon />
+              <ResetDot show={canReset} />
+            </Button>
+          </SheetHeader>
 
-          <IconButton onClick={onResetFilter}>
-            <Badge color="error" variant="dot" invisible={!canReset}>
-              <Iconify icon="solar:restart-bold" />
-            </Badge>
-          </IconButton>
+          <Separator />
 
-          <IconButton onClick={onCloseFilter}>
-            <Iconify icon="mingcute:close-line" />
-          </IconButton>
-        </Box>
-
-        <Divider />
-
-        <Scrollbar>
-          <Stack spacing={3} sx={{ p: 3 }}>
+          <div className="grid gap-6 overflow-y-auto p-4">
             {renderGender}
             {renderCategory}
             {renderColors}
             {renderPrice}
             {renderRating}
-          </Stack>
-        </Scrollbar>
-      </Drawer>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
