@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDownIcon, ChevronUpIcon, CopyIcon, RotateCcwIcon, XIcon } from "lucide-react";
 
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Button from "@mui/material/Button";
-import Tooltip from "@mui/material/Tooltip";
-import Collapse from "@mui/material/Collapse";
-import IconButton from "@mui/material/IconButton";
-import Typography from "@mui/material/Typography";
-import LinearProgress from "@mui/material/LinearProgress";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 import type { UploadJob } from "./upload-manager";
 import { isActive, useUploadManager } from "./upload-manager";
@@ -62,99 +57,98 @@ export function UploadTray() {
       : `Uploads (${jobs.length})`;
 
   return (
-    <Paper
-      elevation={8}
-      sx={{
-        position: "fixed",
-        right: { xs: 8, sm: 24 },
-        bottom: { xs: 8, sm: 24 },
-        width: { xs: "calc(100vw - 16px)", sm: 380 },
-        zIndex: (theme) => theme.zIndex.snackbar,
-        overflow: "hidden",
-      }}
+    <section
+      aria-label="Uploads"
+      // Above dialogs (z-50) so progress stays visible while a form is open.
+      className="fixed right-2 bottom-2 z-[60] w-[calc(100vw-1rem)] overflow-hidden rounded-xl bg-popover text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 sm:right-6 sm:bottom-6 sm:w-[380px]"
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ px: 2, py: 1, bgcolor: "background.neutral" }}
-      >
-        <Typography variant="subtitle2">{heading}</Typography>
-        <Stack direction="row" spacing={0.5}>
+      <div className="flex items-center justify-between gap-2 bg-muted/50 py-1.5 pr-1.5 pl-3">
+        <h2 className="font-medium">{heading}</h2>
+        <div className="flex items-center gap-1">
           {activeCount === 0 && (
-            <Button size="small" onClick={dismissFinished}>
+            <Button variant="ghost" size="sm" onClick={dismissFinished}>
               Clear
             </Button>
           )}
-          <IconButton
-            size="small"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setCollapsed((previous) => !previous)}
             aria-label={collapsed ? "Expand uploads" : "Collapse uploads"}
+            aria-expanded={!collapsed}
           >
-            {collapsed ? "▲" : "▼"}
-          </IconButton>
-        </Stack>
-      </Stack>
+            {collapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
+          </Button>
+        </div>
+      </div>
 
-      <Collapse in={!collapsed}>
-        <Box sx={{ maxHeight: 320, overflowY: "auto" }}>
+      {!collapsed && (
+        <ul className="max-h-80 overflow-y-auto">
           {jobs.map((job) => (
-            <Box key={job.id} sx={{ px: 2, py: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
-              <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Tooltip title={job.fileName}>
-                    <Typography variant="body2" noWrap>
-                      {job.label}
-                    </Typography>
-                  </Tooltip>
-                  <Typography
-                    variant="caption"
-                    color={job.status === "error" ? "error.main" : "text.secondary"}
+            <li key={job.id} className="grid gap-2 border-t px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-medium" title={job.fileName}>
+                    {job.label}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-xs",
+                      job.status === "error" ? "text-destructive" : "text-muted-foreground",
+                    )}
                   >
                     {statusLine(job)}
-                  </Typography>
-                </Box>
+                  </p>
+                </div>
 
-                <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                <div className="flex shrink-0 items-center gap-1">
                   {isActive(job) && (
-                    <Button size="small" color="inherit" onClick={() => cancelUpload(job.id)}>
+                    <Button variant="ghost" size="sm" onClick={() => cancelUpload(job.id)}>
                       Cancel
                     </Button>
                   )}
                   {(job.status === "error" || job.status === "canceled") && (
-                    <Button size="small" onClick={() => retryUpload(job.id)}>
+                    <Button variant="outline" size="sm" onClick={() => retryUpload(job.id)}>
+                      <RotateCcwIcon />
                       Retry
                     </Button>
                   )}
                   {!isActive(job) && (
-                    <IconButton size="small" onClick={() => dismissJob(job.id)} aria-label="Dismiss">
-                      ✕
-                    </IconButton>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => dismissJob(job.id)}
+                      aria-label="Dismiss"
+                    >
+                      <XIcon />
+                    </Button>
                   )}
-                </Stack>
-              </Stack>
+                </div>
+              </div>
 
-              {isActive(job) && (
-                <LinearProgress
-                  variant={job.status === "uploading" ? "determinate" : "indeterminate"}
-                  value={job.progress}
-                  sx={{ mt: 1 }}
-                />
-              )}
+              {isActive(job) &&
+                (job.status === "uploading" ? (
+                  <Progress value={job.progress} aria-label={`${job.label} upload progress`} />
+                ) : (
+                  // Presigning/attaching have no measurable progress.
+                  <Progress value={null} aria-label={`${job.label} in progress`} className="[&_[data-slot=progress-indicator]]:w-1/3 [&_[data-slot=progress-indicator]]:animate-pulse" />
+                ))}
 
               {job.status === "success" && !job.attach && job.deliveryUrl && (
                 <Button
-                  size="small"
-                  sx={{ mt: 0.5, px: 0 }}
+                  variant="link"
+                  size="sm"
+                  className="h-auto justify-start px-0"
                   onClick={() => navigator.clipboard?.writeText(job.deliveryUrl)}
                 >
+                  <CopyIcon />
                   Copy URL
                 </Button>
               )}
-            </Box>
+            </li>
           ))}
-        </Box>
-      </Collapse>
-    </Paper>
+        </ul>
+      )}
+    </section>
   );
 }
