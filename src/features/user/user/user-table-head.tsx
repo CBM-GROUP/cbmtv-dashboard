@@ -1,6 +1,5 @@
-import TableRow from '@mui/material/TableRow';
-import TableHead from '@mui/material/TableHead';
-import TableCell from '@mui/material/TableCell';
+import { cn } from '@/lib/utils';
+import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // ----------------------------------------------------------------------
 
@@ -22,20 +21,22 @@ type UserTableHeadProps = {
   headLabel: HeadCell[];
 };
 
+const alignClass = { left: 'text-left', right: 'text-right', center: 'text-center' };
+
 export function UserTableHead({ headLabel }: UserTableHeadProps) {
   return (
-    <TableHead>
-      <TableRow>
+    <TableHeader>
+      <TableRow className="hover:bg-transparent">
         {headLabel.map((headCell) => (
-          <TableCell
+          <TableHead
             key={headCell.id}
-            align={headCell.align || 'left'}
-            sx={{ width: headCell.width, minWidth: headCell.minWidth }}
+            className={cn(alignClass[headCell.align || 'left'], 'first:pl-4 last:pr-4')}
+            style={{ width: headCell.width, minWidth: headCell.minWidth }}
           >
             {headCell.label}
-          </TableCell>
+          </TableHead>
         ))}
       </TableRow>
-    </TableHead>
+    </TableHeader>
   );
 }
