@@ -1,6 +1,20 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    if (!apiBaseUrl) return [];
+
+    return [
+      {
+        source: '/backend-api/:path*',
+        destination: `${new URL(apiBaseUrl).origin}/:path*/`,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
@@ -28,4 +42,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Next 15 shares .next between dev and build; isolate dev so a production
+// build cannot remove files the running dev server is about to write.
+export default (phase: string): NextConfig => ({
+  ...nextConfig,
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
+});
