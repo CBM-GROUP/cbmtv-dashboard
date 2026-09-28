@@ -9,7 +9,8 @@ interface User {
   id: number;
   email: string;
   name: string;
-  role: string;
+  role?: string;
+  is_staff?: boolean;
   image?: string;
   displayName?: string;
   phone?: string;
@@ -42,10 +43,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
 
-      setUser(response?.data?.user);
-      localStorage.setItem('user', JSON.stringify(response?.data?.user));
+      let currentUser: User = response.data.user;
+      try {
+        const profile = await apiClient.get<User>('/api/accounts/profile/');
+        currentUser = profile.data;
+      } catch (error) {
+        console.error('Failed to fetch user profile', error);
+      }
+
+      setUser(currentUser);
+      localStorage.setItem('user', JSON.stringify(currentUser));
       setLoading(false);
-      return response.data;
+      return currentUser;
     } catch (error) {
       console.error('Login failed', error);
       throw error;
@@ -68,10 +77,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUser = useCallback(async () => {
     try {
-      const userResponse = JSON.parse(localStorage.getItem('user') as string);
-      setUser(userResponse);
+      const response = await apiClient.get<User>('/api/accounts/profile/');
+      setUser(response.data);
+      localStorage.setItem('user', JSON.stringify(response.data));
     } catch (error) {
       console.error('Failed to fetch user', error);
+      const cachedUser = localStorage.getItem('user');
+      if (cachedUser) {
+        try {
+          setUser(JSON.parse(cachedUser));
+        } catch {
+          localStorage.removeItem('user');
+        }
+      }
     }
   }, []);
 
