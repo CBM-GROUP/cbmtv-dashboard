@@ -14,7 +14,6 @@ import {
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -109,33 +108,28 @@ export default function Page() {
   return (
     <PageShell>
       <PageHeader title="Dashboard" description="An overview of the CBM TV catalogue." />
+      <div className="flex flex-col items-start gap-3">
+        <Button
+          onClick={handleSync}
+          disabled={syncing}
+          title="Rebuild the search index after bulk changes so new and edited titles show up in app search. Requires an admin account."
+        >
+          {syncing ? <LoaderCircleIcon className="animate-spin" /> : <RefreshCwIcon />}
+          {syncing ? 'Syncing…' : 'Sync Search Data'}
+        </Button>
+        {syncResult && (
+          <div className="w-full">
+            <StatusAlert variant={syncResult.variant} onDismiss={() => setSyncResult(null)}>
+              {syncResult.message}
+            </StatusAlert>
+          </div>
+        )}
+      </div>
       <div className="grid gap-4 md:grid-cols-3">
         {SUMMARIES.map(({ key, title, href }) => (
           <SummaryCard key={key} title={title} href={href} count={counts[key] ?? null} />
         ))}
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Search index</CardTitle>
-          <CardDescription>
-            Rebuild the search index after bulk changes so new and edited titles show up in app
-            search. Requires an admin account.
-          </CardDescription>
-        </CardHeader>
-        {syncResult && (
-          <CardContent>
-            <StatusAlert variant={syncResult.variant} onDismiss={() => setSyncResult(null)}>
-              {syncResult.message}
-            </StatusAlert>
-          </CardContent>
-        )}
-        <CardFooter>
-          <Button onClick={handleSync} disabled={syncing}>
-            {syncing ? <LoaderCircleIcon className="animate-spin" /> : <RefreshCwIcon />}
-            {syncing ? 'Syncing…' : 'Sync Search Data'}
-          </Button>
-        </CardFooter>
-      </Card>
     </PageShell>
   );
 }
