@@ -1,18 +1,40 @@
 import type { ChangeEvent } from 'react';
-import { BiLoader, BiUpload } from 'react-icons/bi';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
+import { useEffect, useId, useState } from 'react';
 import Image from 'next/image';
+import { ImageUpIcon } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { FormField } from '@/components/form-field';
 import { useMediaUpload } from '@/hooks/use-media-upload';
 
 interface ImageUploaderProps {
   onUpload: (url: string) => void;
-  value: string;
+  /** Null until an editor uploads one; the API returns null for unset media. */
+  value: string | null | undefined;
   label: string;
 }
 
 export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
+  const id = useId();
   const uploader = useMediaUpload('image');
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const uploading = uploader.status === 'uploading';
+
+  useEffect(() => {
+    setPreviewFailed(false);
+  }, [value]);
+
+  const hasValidPreviewUrl = (() => {
+    if (!value) return false;
+
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  })();
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) {
@@ -26,39 +48,53 @@ export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
     }
   };
 
+  const error =
+    uploader.error ||
+    (value && !hasValidPreviewUrl ? 'Thumbnail URL must be a complete HTTP or HTTPS URL.' : '') ||
+    (hasValidPreviewUrl && previewFailed ? 'The uploaded thumbnail could not be displayed.' : '');
+
   return (
-    <>
-      <div className="flex items-center space-x-4">
+    <FormField label={label} htmlFor={id} error={error || undefined}>
+      <div className="flex items-center gap-3">
         <div
-          className={`relative h-[80px] w-[80px] bg-gray-200 flex-shrink-0 rounded-[8px] mr-[10px] flex items-center justify-center overflow-hidden ${uploader.status === 'uploading' && 'animate-pulse'}`}
+          className={cn(
+            'relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-input bg-muted/50 text-muted-foreground transition-colors hover:bg-muted focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50',
+            uploading && 'animate-pulse',
+          )}
         >
           <input
             type="file"
             onChange={handleImageUpload}
             accept="image/*"
-            className="w-full h-full absolute top-0 left-0 z-10 opacity-0 cursor-pointer"
+            aria-label={`Upload ${label}`}
+            className="absolute inset-0 z-10 cursor-pointer opacity-0"
           />
-          <div className="w-full h-full flex items-center justify-center bg-gray-200 border-0">
-            {uploader.status === 'uploading' ? <BiLoader /> : <BiUpload />}
-          </div>
+          {uploading ? (
+            <span className="text-xs font-medium tabular-nums">{uploader.progress}%</span>
+          ) : (
+            <ImageUpIcon className="size-5" />
+          )}
         </div>
-
-        <TextField margin="dense" label={label} type="text" fullWidth value={value} disabled />
+        <Input id={id} type="text" value={value ?? ''} placeholder="Upload an image" readOnly disabled />
       </div>
-      {uploader.error && <p role="alert">{uploader.error}</p>}
-      {value && (
-        <Box mt={2} sx={{ display: 'flex', justifyContent: 'center' }}>
+      {hasValidPreviewUrl && !previewFailed && (
+        <div className="mt-1 flex justify-center overflow-hidden rounded-lg border bg-muted/30">
           <Image
-            src={value}
+            src={value as string}
             alt="Preview"
-            width={0}
-            height={0}
-            sizes="100vw"
-            className="object-cover"
-            style={{ width: '100%', height: 'auto', maxHeight: 200, borderRadius: 8 }}
+            width={480}
+            height={270}
+            sizes="(max-width: 600px) 100vw, 480px"
+            // Previews point at whatever host an editor saved. next/image
+            // THROWS during render for a hostname missing from next.config.js
+            // remotePatterns, which takes down the whole form and never
+            // reaches onError. unoptimized skips that host check.
+            unoptimized
+            onError={() => setPreviewFailed(true)}
+            className="h-auto max-h-[270px] w-full object-contain"
           />
-        </Box>
+        </div>
       )}
-    </>
+    </FormField>
   );
 }

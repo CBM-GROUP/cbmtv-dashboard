@@ -8,13 +8,24 @@ Prepare and deploy to Vercel
 - Confirm `.env.example` contains the required variables. Do NOT commit real secrets.
 
 3) Required environment variables (set these in Vercel Project Settings -> Environment Variables)
-- NEXT_PUBLIC_API_BASE_URL
+- NEXT_PUBLIC_API_BASE_URL — must include the scheme, e.g. `https://api.example.com`.
+  A bare hostname makes axios resolve calls against the dashboard's own origin.
+  Set this for both Production and Preview if both environments use the backend.
+  Changes take effect only after a new deployment or redeployment.
 - NEXT_PUBLIC_MEILISEARCH_URL
 - NEXT_PUBLIC_MEILISEARCH_API_KEY
 - NEXT_PUBLIC_GOOGLE_CLIENT_ID
-- MUX_TOKEN_ID
-- MUX_TOKEN_SECRET
+- CLOUDFRONT_BASE_URL — public CDN base, read at build time by `next.config.ts`
+  to allow-list the image host for next/image. Without it, uploaded thumbnails
+  fail to render.
+- MUX_TOKEN_ID / MUX_TOKEN_SECRET — only for the legacy Mux routes under
+  `src/app/api/{create-upload,upload-status,asset-details}`.
 - (Optional) SKIP_DB_SEED=true — keeps the app from attempting any DB seed/migrate at runtime
+
+Do NOT set AWS credentials here. S3 upload presigning is handled by the Django
+backend at `POST /api/content/media/upload-target/`; `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, `AWS_S3_REGION_NAME` and `AWS_STORAGE_BUCKET_NAME`
+belong in the backend's environment only.
 
 4) Deploy steps (quick)
 - Push your branch to GitHub/GitLab (connected to Vercel).
@@ -38,3 +49,7 @@ Prepare and deploy to Vercel
 7) Troubleshooting
 - If the deployed app still tries to seed or run Prisma: ensure `@prisma/client` and `prisma` are removed from `package.json`, and that your project on Vercel is using the latest commit.
 - If assets are large or upload times are long, add additional ignore rules to `.vercelignore`.
+- On Vercel Hobby, the author of a commit deployed from Git must be the Vercel
+  project owner. GitHub merge commits can be authored by the account that merges
+  the pull request, even when the branch commits have a different author. Merge
+  into the production branch with the GitHub account linked to the project owner.

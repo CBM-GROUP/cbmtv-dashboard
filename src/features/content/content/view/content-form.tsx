@@ -1,21 +1,19 @@
-import type { SelectChangeEvent } from "@mui/material/Select";
 import type { ChangeEvent } from "react";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
-
-import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FormDialog } from "@/components/form-dialog";
+import { FormField, StatusAlert } from "@/components/form-field";
 
 import { contentService } from "src/services/contentService";
 
@@ -26,6 +24,55 @@ import { VideoUploader } from "@/components/video-uploader";
 import { Content, Channel } from "@/types";
 
 dayjs.extend(duration);
+
+const CONTENT_TYPES = [
+  { value: "animations", label: "Animations" },
+  { value: "series", label: "Series" },
+  { value: "movie", label: "Movie" },
+  { value: "music", label: "Music" },
+  { value: "documentary", label: "Documentary" },
+  { value: "miniseries", label: "Miniseries" },
+  { value: "original", label: "Original" },
+];
+
+const STATUSES = [
+  { value: "preview", label: "Preview" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "comingsoon", label: "Comingsoon" },
+];
+
+/**
+ * The API stores duration as a Django DurationField, which DRF serialises as
+ * "[DD ]HH:MM:SS[.ffffff]" but accepts as either that or a bare second count.
+ * The form edits it as a plain number of seconds, so incoming values have to be
+ * normalised — `parseInt("00:01:30")` silently yields 0.
+ */
+function durationToSeconds(value: string | number | null | undefined): number {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? Math.floor(value) : 0;
+
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+
+  const [dayPart, clockPart] = trimmed.includes(" ")
+    ? [trimmed.slice(0, trimmed.indexOf(" ")), trimmed.slice(trimmed.indexOf(" ") + 1)]
+    : ["0", trimmed];
+
+  const parts = clockPart.split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return 0;
+  while (parts.length < 3) parts.unshift(0);
+
+  const [hours, minutes, seconds] = parts;
+  const days = Number(dayPart);
+  return (
+    (Number.isFinite(days) ? days : 0) * 86400 +
+    hours * 3600 +
+    minutes * 60 +
+    Math.floor(seconds)
+  );
+}
 
 interface ContentFormProps {
   open: boolean;
@@ -52,21 +99,60 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     size: "",
     duration: "",
   });
-  const [duration, setDuration] = useState({ hours: 0, minutes: 0 });
+  const [formError, setFormError] = useState("");
 
-  const trailerUploader = useMediaUpload("video");
-  const streamUploader = useMediaUpload("video");
+  /**
+   * Set when a *new* item is saved early to give a background upload something
+   * to attach to. From then on this dialog edits that record rather than
+   * creating another one.
+   */
+  const [autoSavedId, setAutoSavedId] = useState<string | null>(null);
+  const contentId = editItem?.id ?? autoSavedId;
+
+  /**
+   * Videos are uploaded straight to S3 and the URL is PATCHed onto the record
+   * when the transfer finishes, so the record has to exist first. For a new
+   * item that means saving it now -- which is why picking a video needs the
+   * same validation as Save.
+   */
+  const ensureSaved = async () => {
+    if (contentId) return contentId;
+
+    if (!formData.title.trim()) {
+      throw new Error("Add a title before uploading video.");
+    }
+    if (Number(formData.channel) <= 0) {
+      throw new Error("Select a channel before uploading video.");
+    }
+
+    const created = await contentService.createContent(buildPayload());
+    setAutoSavedId(created.id);
+    onSave();
+    return created.id as string;
+  };
+
+  const attachTo = (field: "trailer_link" | "streaming_link") => async () => ({
+    endpoint: `/api/content/${await ensureSaved()}/`,
+    field,
+  });
+
+  const trailerUploader = useMediaUpload("video", {
+    label: "Trailer",
+    resolveAttach: attachTo("trailer_link"),
+  });
+  const streamUploader = useMediaUpload("video", {
+    label: "Streaming video",
+    resolveAttach: attachTo("streaming_link"),
+  });
 
   useEffect(() => {
+    setFormError("");
+    setAutoSavedId(null);
     if (editItem) {
-      setFormData(editItem);
-      if (editItem.duration) {
-        const totalMinutes = parseInt(editItem.duration, 10);
-        setDuration({
-          hours: Math.floor(totalMinutes / 60),
-          minutes: totalMinutes % 60,
-        });
-      }
+      setFormData({
+        ...editItem,
+        duration: editItem.duration ? String(durationToSeconds(editItem.duration)) : "",
+      });
     } else {
       setFormData({
         title: "",
@@ -99,35 +185,49 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     }
   }, [streamUploader.finalUrl]);
 
-  useEffect(() => {
-    const totalMinutes = duration.hours * 60 + duration.minutes;
-    setFormData((prev) => ({ ...prev, duration: String(totalMinutes) }));
-  }, [duration]);
-
-  const handleChange = (
-    e:
-      | ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>
-      | SelectChangeEvent,
-  ) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
-      [e.target.name as string]: e.target.value,
+      [e.target.name]: e.target.value,
     });
   };
 
-  const handleSubmit = async () => {
-    try {
-      const data = {
-        ...formData,
-        channel: Number(formData.channel),
-        size: String(parseInt(formData.size, 10) || 0),
-        duration: formData.duration,
-      };
+  const handleSelectChange = (name: "content_type" | "channel" | "status", value: string | null) => {
+    if (value === null) return;
+    if (name === "channel") {
+      setFormError("");
+    }
+    setFormData({ ...formData, [name]: value });
+  };
 
-      if (editItem) {
-        await contentService.updateContent(editItem.id, data);
+  // A function declaration so `ensureSaved`, defined above it, can call it.
+  function buildPayload() {
+    const trimmedDuration = (formData.duration ?? "").trim();
+    const trimmedSize = (formData.size ?? "").trim();
+
+    return {
+      ...formData,
+      channel: Number(formData.channel),
+      // Both are nullable on the model; send null rather than coercing a
+      // blank field to "0", which previously overwrote real values.
+      size: trimmedSize === "" ? null : trimmedSize,
+      duration: trimmedDuration === "" ? null : String(durationToSeconds(trimmedDuration)),
+    };
+  }
+
+  const handleSubmit = async () => {
+    if (Number(formData.channel) <= 0) {
+      setFormError("Select a channel before saving content.");
+      return;
+    }
+
+    try {
+      // `contentId` covers the auto-save that a background upload triggers, so
+      // saving afterwards updates that record instead of creating a duplicate.
+      if (contentId) {
+        await contentService.updateContent(contentId, buildPayload());
       } else {
-        await contentService.createContent(data);
+        await contentService.createContent(buildPayload());
       }
       onSave();
       onClose();
@@ -136,153 +236,148 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     }
   };
 
+  const channelItems = channels.map((channel) => ({ value: String(channel.id), label: channel.name }));
+  const hasChannel = Number(formData.channel) > 0;
+
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>
-        {editItem ? "Edit Content" : "Create Content"}
-      </DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin="dense"
-          name="title"
-          label="Title"
-          type="text"
-          fullWidth
-          value={formData.title}
-          onChange={handleChange}
-        />
-        <FormControl fullWidth margin="dense">
-          <InputLabel>Content Type</InputLabel>
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      title={editItem || autoSavedId ? "Edit Content" : "Create Content"}
+      className="sm:max-w-2xl"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={Number(formData.channel) <= 0}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      {autoSavedId && (
+        <StatusAlert variant="info">
+          Saved so the upload can finish in the background. You can close this
+          dialog — the video link is attached when it completes.
+        </StatusAlert>
+      )}
+      <FormField label="Title" htmlFor="content-title">
+        <Input id="content-title" autoFocus name="title" value={formData.title} onChange={handleChange} />
+      </FormField>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Content Type" htmlFor="content-type">
           <Select
-            name="content_type"
+            items={CONTENT_TYPES}
             value={formData.content_type}
-            onChange={handleChange}
+            onValueChange={(value) => handleSelectChange("content_type", value)}
           >
-            <MenuItem value="animations">Animations</MenuItem>
-            <MenuItem value="series">Series</MenuItem>
-            <MenuItem value="movie">Movie</MenuItem>
-            <MenuItem value="music">Music</MenuItem>
-            <MenuItem value="documentary">Documentary</MenuItem>
-            <MenuItem value="miniseries">Miniseries</MenuItem>
-            <MenuItem value="original">Original</MenuItem>
+            <SelectTrigger id="content-type" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CONTENT_TYPES.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-        </FormControl>
-        <FormControl fullWidth margin="dense">
-          <InputLabel>Channel</InputLabel>
+        </FormField>
+        <FormField label="Channel" htmlFor="content-channel" error={formError || undefined}>
           <Select
-            name="channel"
-            value={String(formData.channel)}
-            onChange={handleChange}
+            items={channelItems}
+            value={hasChannel ? String(formData.channel) : null}
+            onValueChange={(value) => handleSelectChange("channel", value)}
           >
-            {channels.map((channel) => (
-              <MenuItem key={channel.id} value={String(channel.id)}>
-                {channel.name}
-              </MenuItem>
-            ))}
+            <SelectTrigger id="content-channel" className="w-full" aria-invalid={Boolean(formError)}>
+              <SelectValue placeholder="Select a channel" />
+            </SelectTrigger>
+            <SelectContent>
+              {channelItems.map((channel) => (
+                <SelectItem key={channel.value} value={channel.value}>
+                  {channel.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-        </FormControl>
-        <TextField
-          margin="dense"
+        </FormField>
+      </div>
+      <FormField label="Description" htmlFor="content-description">
+        <Input
+          id="content-description"
           name="description"
-          label="Description"
-          type="text"
-          fullWidth
           value={formData.description}
           onChange={handleChange}
         />
-        <VideoUploader
-          label="Trailer Video"
-          status={trailerUploader.status}
-          error={trailerUploader.error}
-          finalUrl={formData.trailer_link}
-          onUpload={trailerUploader.uploadFile}
-        />
-        <VideoUploader
-          label="Streaming Video"
-          status={streamUploader.status}
-          error={streamUploader.error}
-          finalUrl={formData.streaming_link}
-          onUpload={streamUploader.uploadFile}
-        />
-        <ImageUploader
-          label="Thumbnail URL"
-          value={formData.thumbnail}
-          onUpload={(url) => setFormData({ ...formData, thumbnail: url })}
-        />
-        <TextField
-          margin="dense"
-          name="director"
-          label="Director"
-          type="text"
-          fullWidth
-          value={formData.director}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          name="writer"
-          label="Writer"
-          type="text"
-          fullWidth
-          value={formData.writer}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          name="genre"
-          label="Genre"
-          type="text"
-          fullWidth
-          value={formData.genre}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          name="country"
-          label="Country"
-          type="text"
-          fullWidth
-          value={formData.country}
-          onChange={handleChange}
-        />
-        <FormControl fullWidth margin="dense">
-          <InputLabel>Status</InputLabel>
-          <Select name="status" value={formData.status} onChange={handleChange}>
-            <MenuItem value="preview">Preview</MenuItem>
-            <MenuItem value="approved">Approved</MenuItem>
-            <MenuItem value="rejected">Rejected</MenuItem>
-            <MenuItem value="comingsoon">Comingsoon</MenuItem>
+      </FormField>
+      <VideoUploader
+        label="Trailer Video"
+        status={trailerUploader.status}
+        progress={trailerUploader.progress}
+        error={trailerUploader.error}
+        finalUrl={formData.trailer_link}
+        onUpload={trailerUploader.uploadFile}
+      />
+      <VideoUploader
+        label="Streaming Video"
+        status={streamUploader.status}
+        progress={streamUploader.progress}
+        error={streamUploader.error}
+        finalUrl={formData.streaming_link}
+        onUpload={streamUploader.uploadFile}
+      />
+      <ImageUploader
+        label="Thumbnail URL"
+        value={formData.thumbnail}
+        onUpload={(url) => setFormData({ ...formData, thumbnail: url })}
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Director" htmlFor="content-director">
+          <Input id="content-director" name="director" value={formData.director} onChange={handleChange} />
+        </FormField>
+        <FormField label="Writer" htmlFor="content-writer">
+          <Input id="content-writer" name="writer" value={formData.writer} onChange={handleChange} />
+        </FormField>
+        <FormField label="Genre" htmlFor="content-genre">
+          <Input id="content-genre" name="genre" value={formData.genre} onChange={handleChange} />
+        </FormField>
+        <FormField label="Country" htmlFor="content-country">
+          <Input id="content-country" name="country" value={formData.country} onChange={handleChange} />
+        </FormField>
+        <FormField label="Status" htmlFor="content-status">
+          <Select
+            items={STATUSES}
+            value={formData.status}
+            onValueChange={(value) => handleSelectChange("status", value)}
+          >
+            <SelectTrigger id="content-status" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-        </FormControl>
-        <TextField
-          margin="dense"
-          name="size"
-          label="Size"
-          type="number"
-          fullWidth
-          value={formData.size}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          name="duration"
-          label="Duration (in seconds)"
-          type="text"
-          fullWidth
-          value={formData.duration}
-          onChange={handleChange}
-        />
-        <Typography variant="caption">
-          {formData.duration && !isNaN(Number(formData.duration))
+        </FormField>
+        <FormField label="Size" htmlFor="content-size">
+          <Input id="content-size" name="size" type="number" value={formData.size ?? ""} onChange={handleChange} />
+        </FormField>
+      </div>
+      <FormField
+        label="Duration (in seconds)"
+        htmlFor="content-duration"
+        hint={
+          formData.duration && !isNaN(Number(formData.duration))
             ? dayjs.duration(Number(formData.duration), "seconds").format("HH:mm:ss")
-            : ""}
-        </Typography>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSubmit}>Save</Button>
-      </DialogActions>
-    </Dialog>
+            : undefined
+        }
+      >
+        <Input id="content-duration" name="duration" value={formData.duration ?? ""} onChange={handleChange} />
+      </FormField>
+    </FormDialog>
   );
 }

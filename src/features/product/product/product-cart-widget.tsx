@@ -1,47 +1,31 @@
-import type { BoxProps } from '@mui/material/Box';
-
-import Box from '@mui/material/Box';
-import Badge from '@mui/material/Badge';
-
 import Link from 'next/link';
+import { ShoppingCartIcon } from 'lucide-react';
 
-import { Iconify } from 'src/components/iconify';
+import { cn } from '@/lib/utils';
 
 // ----------------------------------------------------------------------
 
-type CartIconProps = BoxProps & {
+type CartIconProps = {
   totalItems: number;
+  className?: string;
 };
 
-export function CartIcon({ totalItems, sx, ...other }: CartIconProps) {
+export function CartIcon({ totalItems, className }: CartIconProps) {
   return (
-    <Box
-      component={Link}
+    <Link
       href="#"
-      sx={[
-        (theme) => ({
-          right: 0,
-          top: 112,
-          zIndex: 999,
-          display: 'flex',
-          cursor: 'pointer',
-          position: 'fixed',
-          color: 'text.primary',
-          borderTopLeftRadius: 16,
-          borderBottomLeftRadius: 16,
-          bgcolor: 'background.paper',
-          padding: theme.spacing(1, 3, 1, 2),
-          boxShadow: theme.vars.customShadows.dropdown,
-          transition: theme.transitions.create(['opacity']),
-          '&:hover': { opacity: 0.72 },
-        }),
-        ...(Array.isArray(sx) ? sx : [sx]),
-      ]}
-      {...other}
+      aria-label={`Cart, ${totalItems} items`}
+      className={cn(
+        'fixed top-28 right-0 z-40 flex rounded-l-2xl bg-popover py-2 pr-6 pl-4 text-popover-foreground shadow-lg ring-1 ring-foreground/10 transition-opacity hover:opacity-70',
+        className,
+      )}
     >
-      <Badge showZero badgeContent={totalItems} color="error" max={99}>
-        <Iconify icon="solar:cart-3-bold" width={24} />
-      </Badge>
-    </Box>
+      <span className="relative">
+        <ShoppingCartIcon className="size-6" />
+        <span className="absolute -top-2 -right-2.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-white tabular-nums">
+          {totalItems > 99 ? '99+' : totalItems}
+        </span>
+      </span>
+    </Link>
   );
 }

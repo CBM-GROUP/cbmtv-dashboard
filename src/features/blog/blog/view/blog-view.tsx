@@ -1,14 +1,10 @@
 import { useState, useCallback } from 'react';
+import { PlusIcon } from 'lucide-react';
 
-import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import Pagination from '@mui/material/Pagination';
-
-import { DashboardContent } from 'src/layouts/dashboard';
-
-import { Iconify } from 'src/components/iconify';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { NumberedPagination } from '@/components/numbered-pagination';
+import { PageHeader, PageShell } from '@/components/page-shell';
 
 import { PostItem } from '../post-item';
 import { PostSort } from '../post-sort';
@@ -24,40 +20,25 @@ type Props = {
 
 export function BlogView({ posts }: Props) {
   const [sortBy, setSortBy] = useState('latest');
+  const [page, setPage] = useState(1);
 
   const handleSort = useCallback((newSort: string) => {
     setSortBy(newSort);
   }, []);
 
   return (
-    <DashboardContent>
-      <Box
-        sx={{
-          mb: 5,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          Blog
-        </Typography>
-        <Button
-          variant="contained"
-          color="inherit"
-          startIcon={<Iconify icon="mingcute:add-line" />}
-        >
-          New post
-        </Button>
-      </Box>
+    <PageShell>
+      <PageHeader
+        title="Blog"
+        actions={
+          <Button>
+            <PlusIcon />
+            New post
+          </Button>
+        }
+      />
 
-      <Box
-        sx={{
-          mb: 5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <PostSearch posts={posts} />
         <PostSort
           sortBy={sortBy}
@@ -68,29 +49,26 @@ export function BlogView({ posts }: Props) {
             { value: 'oldest', label: 'Oldest' },
           ]}
         />
-      </Box>
+      </div>
 
-      <Grid container spacing={3}>
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         {posts.map((post, index) => {
           const latestPostLarge = index === 0;
           const latestPost = index === 1 || index === 2;
 
           return (
-            <Grid
+            <PostItem
               key={post.id}
-              size={{
-                xs: 12,
-                sm: latestPostLarge ? 12 : 6,
-                md: latestPostLarge ? 6 : 3,
-              }}
-            >
-              <PostItem post={post} latestPost={latestPost} latestPostLarge={latestPostLarge} />
-            </Grid>
+              className={cn(latestPostLarge && 'sm:col-span-2')}
+              post={post}
+              latestPost={latestPost}
+              latestPostLarge={latestPostLarge}
+            />
           );
         })}
-      </Grid>
+      </div>
 
-      <Pagination count={10} color="primary" sx={{ mt: 8, mx: 'auto' }} />
-    </DashboardContent>
+      <NumberedPagination count={10} page={page} onPageChange={setPage} className="mt-4" />
+    </PageShell>
   );
 }
