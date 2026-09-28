@@ -33,8 +33,8 @@ export const navData = [
     icon: <BsMegaphoneFill />,
   },
   {
-    title: 'Hero Settings',
-    path: '/hero-settings',
+    title: 'Settings',
+    path: '/settings',
     icon: <BsGearFill />,
     adminOnly: true,
   },

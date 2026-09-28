@@ -23,7 +23,7 @@ export function NavMain() {
     <SidebarGroup>
       <SidebarGroupLabel>Management</SidebarGroupLabel>
       <SidebarMenu>
-        {navData.filter((item) => !item.adminOnly || user?.role === "admin").map((item) => (
+        {navData.filter((item) => !item.adminOnly || user?.is_staff || user?.role === "admin").map((item) => (
           <SidebarMenuItem key={item.path}>
             <SidebarMenuButton
               tooltip={item.title}
