@@ -112,10 +112,10 @@ export default function Page() {
         <Button
           onClick={handleSync}
           disabled={syncing}
-          title="Rebuild the search index after bulk changes so new and edited titles show up in app search. Requires an admin account."
+          title="Rebuild the search index to repair search after an indexing failure. Requires an admin account."
         >
           {syncing ? <LoaderCircleIcon className="animate-spin" /> : <RefreshCwIcon />}
-          {syncing ? 'Syncing…' : 'Sync Search Data'}
+          {syncing ? 'Rebuilding…' : 'Rebuild / Repair Search Index'}
         </Button>
         {syncResult && (
           <div className="w-full">

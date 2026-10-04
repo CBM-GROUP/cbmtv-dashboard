@@ -18,6 +18,7 @@ import { FormField } from "@/components/form-field";
 import { PageHeader, PageShell } from "@/components/page-shell";
 
 import apiClient from "src/services/api";
+import { fetchAllPages } from "src/services/fetchAllPages";
 
 import { useMediaUpload } from "@/hooks/use-media-upload";
 import { VideoUploader } from "@/components/video-uploader";
@@ -26,7 +27,7 @@ interface Episode {
   id: string;
   title: string;
   episode_number: number;
-  file_url: string;
+  streaming_link: string;
 }
 
 export function EpisodeListView() {
@@ -37,30 +38,43 @@ export function EpisodeListView() {
   const [formData, setFormData] = useState({
     title: "",
     episode_number: null as number | null,
-    file_url: "",
+    streaming_link: "",
   });
+  const [autoSavedId, setAutoSavedId] = useState<string | null>(null);
+
+  const ensureSaved = async () => {
+    if (editItem?.id || autoSavedId) return editItem?.id || autoSavedId;
+    if (!formData.title.trim() || !Number(formData.episode_number)) {
+      throw new Error("Add an episode title and number before uploading video.");
+    }
+    const { data } = await apiClient.post<Episode>("/api/content/episodes/", {
+      ...formData,
+      season: seasonId,
+    });
+    setAutoSavedId(data.id);
+    void fetchEpisodes();
+    return data.id;
+  };
 
   // In edit mode the episode exists, so a finished upload can write its own
   // URL onto the record and the dialog is free to close.
   const uploader = useMediaUpload("video", {
     label: editItem ? `Episode - ${editItem.title}` : "Episode video",
-    attach: editItem
-      ? { endpoint: `/api/content/episodes/${editItem.id}/`, field: "file_url" }
-      : undefined,
+    resolveAttach: async () => ({
+      endpoint: `/api/content/episodes/${await ensureSaved()}/`,
+      field: "streaming_link",
+    }),
   });
 
   useEffect(() => {
     if (uploader.finalUrl) {
-      setFormData((previous) => ({ ...previous, file_url: uploader.finalUrl }));
+      setFormData((previous) => ({ ...previous, streaming_link: uploader.finalUrl }));
     }
   }, [uploader.finalUrl]);
 
   const fetchEpisodes = async () => {
     try {
-      const response = await apiClient.get(
-        `/api/content/episodes/?season=${seasonId}`
-      );
-      setEpisodes(response.data);
+      setEpisodes(await fetchAllPages<Episode>(apiClient, `/api/content/episodes/?season=${seasonId}`));
     } catch (error) {
       console.error("Failed to fetch episodes", error);
     }
@@ -72,15 +86,16 @@ export function EpisodeListView() {
   }, [seasonId]);
 
   const handleOpen = (item: Episode | null = null) => {
+    setAutoSavedId(null);
     setEditItem(item);
     setFormData(
       item
         ? {
             title: item.title,
             episode_number: item.episode_number,
-            file_url: item.file_url || "",
+            streaming_link: item.streaming_link || "",
           }
-        : { title: "", episode_number: null, file_url: "" }
+        : { title: "", episode_number: null, streaming_link: "" }
     );
     setOpen(true);
   };
@@ -97,8 +112,8 @@ export function EpisodeListView() {
   const handleSubmit = async () => {
     const data = { ...formData, season: seasonId };
     try {
-      if (editItem) {
-        await apiClient.patch(`/api/content/episodes/${editItem.id}/`, data);
+      if (editItem || autoSavedId) {
+        await apiClient.patch(`/api/content/episodes/${editItem?.id || autoSavedId}/`, data);
       } else {
         await apiClient.post("/api/content/episodes/", data);
       }
@@ -185,7 +200,7 @@ export function EpisodeListView() {
           status={uploader.status}
           progress={uploader.progress}
           error={uploader.error}
-          finalUrl={formData.file_url}
+          finalUrl={formData.streaming_link}
           onUpload={uploader.uploadFile}
         />
       </FormDialog>
