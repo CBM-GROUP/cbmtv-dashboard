@@ -3,7 +3,7 @@ import { Episode } from "@/types";
 
 export const miniseriesEpisodeService = {
   async getMiniseriesEpisodes(contentId: string): Promise<Episode[]> {
-    const response = await apiClient.get(`/api/content/miniseries/?content=${contentId}`);
+    const response = await apiClient.get(`/api/content/miniseries/?content=${contentId}&scope=dashboard`);
     return response.data;
   },
 

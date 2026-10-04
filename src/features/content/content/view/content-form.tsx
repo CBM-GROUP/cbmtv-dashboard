@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
@@ -17,11 +17,13 @@ import { FormField, StatusAlert } from "@/components/form-field";
 
 import { contentService } from "src/services/contentService";
 
-import { ImageUploader } from "@/components/image-uploader";
-import { useMediaUpload } from "@/hooks/use-media-upload";
-import { VideoUploader } from "@/components/video-uploader";
+import { useUploadManager } from "@/components/upload/upload-manager";
 
 import { Content, Channel } from "@/types";
+import {
+  ContentSaveFailure, MEDIA_FIELDS, saveContentWithMedia,
+  type SelectedMedia, type UploadedMedia,
+} from "../save-content";
 
 dayjs.extend(duration);
 
@@ -100,54 +102,20 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     duration: "",
   });
   const [formError, setFormError] = useState("");
-
-  /**
-   * Set when a *new* item is saved early to give a background upload something
-   * to attach to. From then on this dialog edits that record rather than
-   * creating another one.
-   */
-  const [autoSavedId, setAutoSavedId] = useState<string | null>(null);
-  const contentId = editItem?.id ?? autoSavedId;
-
-  /**
-   * Videos are uploaded straight to S3 and the URL is PATCHed onto the record
-   * when the transfer finishes, so the record has to exist first. For a new
-   * item that means saving it now -- which is why picking a video needs the
-   * same validation as Save.
-   */
-  const ensureSaved = async () => {
-    if (contentId) return contentId;
-
-    if (!formData.title.trim()) {
-      throw new Error("Add a title before uploading video.");
-    }
-    if (Number(formData.channel) <= 0) {
-      throw new Error("Select a channel before uploading video.");
-    }
-
-    const created = await contentService.createContent(buildPayload());
-    setAutoSavedId(created.id);
-    onSave();
-    return created.id as string;
-  };
-
-  const attachTo = (field: "trailer_link" | "streaming_link") => async () => ({
-    endpoint: `/api/content/${await ensureSaved()}/`,
-    field,
+  const [saving, setSaving] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia>({
+    trailer_link: null, streaming_link: null, thumbnail: null,
   });
-
-  const trailerUploader = useMediaUpload("video", {
-    label: "Trailer",
-    resolveAttach: attachTo("trailer_link"),
-  });
-  const streamUploader = useMediaUpload("video", {
-    label: "Streaming video",
-    resolveAttach: attachTo("streaming_link"),
-  });
+  // A successful upload may precede a later upload or DB failure. Reuse its
+  // URL on Save retry instead of creating another orphaned S3 object.
+  const uploadedMedia = useRef<UploadedMedia>({});
+  const { enqueue } = useUploadManager();
 
   useEffect(() => {
+    if (!open) return;
     setFormError("");
-    setAutoSavedId(null);
+    setSelectedMedia({ trailer_link: null, streaming_link: null, thumbnail: null });
+    uploadedMedia.current = {};
     if (editItem) {
       setFormData({
         ...editItem,
@@ -171,19 +139,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
         duration: "",
       });
     }
-  }, [editItem]);
-
-  useEffect(() => {
-    if (trailerUploader.finalUrl) {
-      setFormData((prev) => ({ ...prev, trailer_link: trailerUploader.finalUrl }));
-    }
-  }, [trailerUploader.finalUrl]);
-
-  useEffect(() => {
-    if (streamUploader.finalUrl) {
-      setFormData((prev) => ({ ...prev, streaming_link: streamUploader.finalUrl }));
-    }
-  }, [streamUploader.finalUrl]);
+  }, [editItem, open]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -200,7 +156,6 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     setFormData({ ...formData, [name]: value });
   };
 
-  // A function declaration so `ensureSaved`, defined above it, can call it.
   function buildPayload() {
     const trimmedDuration = (formData.duration ?? "").trim();
     const trimmedSize = (formData.size ?? "").trim();
@@ -216,23 +171,35 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   }
 
   const handleSubmit = async () => {
+    if (saving) return;
+    if (!formData.title.trim()) {
+      setFormError("Add a title before saving content.");
+      return;
+    }
     if (Number(formData.channel) <= 0) {
       setFormError("Select a channel before saving content.");
       return;
     }
 
+    setSaving(true);
+    setFormError("");
     try {
-      // `contentId` covers the auto-save that a background upload triggers, so
-      // saving afterwards updates that record instead of creating a duplicate.
-      if (contentId) {
-        await contentService.updateContent(contentId, buildPayload());
-      } else {
-        await contentService.createContent(buildPayload());
-      }
+      await saveContentWithMedia(
+        buildPayload(), selectedMedia, uploadedMedia.current,
+        (file, type, label) => enqueue(file, type, { label }).done,
+        (payload) => editItem
+          ? contentService.updateContent(editItem.id, payload)
+          : contentService.createContent(payload),
+      );
       onSave();
       onClose();
     } catch (error) {
       console.error("Failed to save content", error);
+      setFormError(error instanceof ContentSaveFailure && error.stage === "upload"
+        ? `Media upload failed. ${editItem ? "Existing content was not changed" : "Content was not created"}. Your form and selected files are ready to retry.`
+        : `Content save failed. ${editItem ? "Existing content was not changed" : "Content was not created"}. Your form is ready to retry.`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -242,26 +209,21 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   return (
     <FormDialog
       open={open}
-      onClose={onClose}
-      title={editItem || autoSavedId ? "Edit Content" : "Create Content"}
+      onClose={() => { if (!saving) onClose(); }}
+      title={editItem ? "Edit Content" : "Create Content"}
       className="sm:max-w-2xl"
       footer={
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={Number(formData.channel) <= 0}>
-            Save
+          <Button onClick={handleSubmit} disabled={saving || Number(formData.channel) <= 0}>
+            {saving ? "Uploading and saving..." : "Save"}
           </Button>
         </>
       }
     >
-      {autoSavedId && (
-        <StatusAlert variant="info">
-          Saved so the upload can finish in the background. You can close this
-          dialog — the video link is attached when it completes.
-        </StatusAlert>
-      )}
+      {formError && <StatusAlert variant="error">{formError}</StatusAlert>}
       <FormField label="Title" htmlFor="content-title">
         <Input id="content-title" autoFocus name="title" value={formData.title} onChange={handleChange} />
       </FormField>
@@ -284,13 +246,13 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
             </SelectContent>
           </Select>
         </FormField>
-        <FormField label="Channel" htmlFor="content-channel" error={formError || undefined}>
+        <FormField label="Channel" htmlFor="content-channel">
           <Select
             items={channelItems}
             value={hasChannel ? String(formData.channel) : null}
             onValueChange={(value) => handleSelectChange("channel", value)}
           >
-            <SelectTrigger id="content-channel" className="w-full" aria-invalid={Boolean(formError)}>
+            <SelectTrigger id="content-channel" className="w-full">
               <SelectValue placeholder="Select a channel" />
             </SelectTrigger>
             <SelectContent>
@@ -311,27 +273,28 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
           onChange={handleChange}
         />
       </FormField>
-      <VideoUploader
-        label="Trailer Video"
-        status={trailerUploader.status}
-        progress={trailerUploader.progress}
-        error={trailerUploader.error}
-        finalUrl={formData.trailer_link}
-        onUpload={trailerUploader.uploadFile}
-      />
-      <VideoUploader
-        label="Streaming Video"
-        status={streamUploader.status}
-        progress={streamUploader.progress}
-        error={streamUploader.error}
-        finalUrl={formData.streaming_link}
-        onUpload={streamUploader.uploadFile}
-      />
-      <ImageUploader
-        label="Thumbnail URL"
-        value={formData.thumbnail}
-        onUpload={(url) => setFormData({ ...formData, thumbnail: url })}
-      />
+      {MEDIA_FIELDS.map((media) => (
+        <FormField key={media.field} label={media.label} htmlFor={`content-${media.field}`}>
+          <Input
+            id={`content-${media.field}`}
+            type="file"
+            accept={media.accept}
+            disabled={saving}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              uploadedMedia.current[media.field] = undefined;
+              setSelectedMedia((previous) => ({ ...previous, [media.field]: file }));
+              setFormError("");
+              event.target.value = "";
+            }}
+          />
+          <span className="text-xs text-muted-foreground">
+            {selectedMedia[media.field]
+              ? `Selected: ${selectedMedia[media.field]?.name}. Upload starts when you click Save.`
+              : formData[media.field] || "No media selected"}
+          </span>
+        </FormField>
+      ))}
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="Director" htmlFor="content-director">
           <Input id="content-director" name="director" value={formData.director} onChange={handleChange} />

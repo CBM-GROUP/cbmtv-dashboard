@@ -54,6 +54,7 @@ dayjs.extend(duration);
 const ALL_CHANNELS = "all";
 
 const TABS = [
+  { value: "all", label: "All" },
   { value: "movies", label: "Movies" },
   { value: "series", label: "Series" },
   { value: "miniseries", label: "Miniseries" },
@@ -130,7 +131,7 @@ export function ContentListView() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const { subscribeToAttached } = useUploadManager();
 
-  const [tab, setTab] = useState("movies");
+  const [tab, setTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -186,6 +187,7 @@ export function ContentListView() {
 
   const handleTabChange = (newValue: string) => {
     setTab(newValue);
+    setPage(0);
   };
 
   const handleDelete = async (id: string) => {
@@ -216,22 +218,24 @@ export function ContentListView() {
     ...channels.map((channel) => ({ value: String(channel.id), label: channel.name })),
   ];
 
-  const rows = content
+  const filteredRows = content
     .filter((item) => {
-      if (tab === "movies") return item.content_type === "movie";
-      if (tab === "series") return item.content_type === "series";
-      if (tab === "miniseries")
-        return item.content_type === "miniseries";
-      if (tab === "music") return item.content_type === "music";
-      return false;
+      if (tab === "all") return true;
+      return item.content_type === (tab === "movies" ? "movie" : tab);
     })
     .filter((item) =>
       channelId ? String(item.channel) === channelId : true,
     )
     .filter((item) =>
       item.title.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    );
+
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
+    if (page > lastPage) setPage(lastPage);
+  }, [filteredRows.length, page, rowsPerPage]);
+
+  const rows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <PageShell>
@@ -250,6 +254,7 @@ export function ContentListView() {
           items={channelItems}
           value={channelId || ALL_CHANNELS}
           onValueChange={(newChannelId) => {
+            setPage(0);
             const params = new URLSearchParams(searchParams);
             if (newChannelId && newChannelId !== ALL_CHANNELS) {
               params.set("channel", newChannelId);
@@ -278,13 +283,16 @@ export function ContentListView() {
             placeholder="Search content..."
             className="pl-8"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(0);
+            }}
           />
         </div>
       </PageToolbar>
 
       <Tabs value={tab} onValueChange={(value) => handleTabChange(String(value))}>
-        {/* Seven tabs overflow a phone screen; let the strip scroll instead of the page. */}
+        {/* Let the tabs scroll on narrow screens instead of the page. */}
         <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
           <TabsList>
             {TABS.map((item) => (
@@ -337,7 +345,7 @@ export function ContentListView() {
                             : "secondary"
                       }
                     >
-                      {item.status}
+                      {item.status || "Unspecified"}
                     </Badge>
                   </TableCell>
                   <TableCell className="pr-4">
@@ -387,7 +395,7 @@ export function ContentListView() {
           </TableBody>
         </Table>
         <DataTablePagination
-          count={content.length}
+          count={filteredRows.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={setPage}
