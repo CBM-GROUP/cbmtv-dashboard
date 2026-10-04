@@ -74,7 +74,7 @@ export function EpisodeListView() {
 
   const fetchEpisodes = async () => {
     try {
-      setEpisodes(await fetchAllPages<Episode>(apiClient, `/api/content/episodes/?season=${seasonId}`));
+      setEpisodes(await fetchAllPages<Episode>(apiClient, `/api/content/episodes/?season=${seasonId}&scope=dashboard`));
     } catch (error) {
       console.error("Failed to fetch episodes", error);
     }
