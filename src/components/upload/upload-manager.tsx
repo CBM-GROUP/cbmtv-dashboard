@@ -166,10 +166,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           },
         });
       } catch (error) {
-        const minutes = Math.round((target.expires_in ?? 3600) / 60);
-        failed(
-          `Upload to storage failed. The upload link was valid for ${minutes} minutes -- retry to get a fresh one.`,
-        );
+        if (axios.isAxiosError(error) && !error.response) {
+          failed("Storage could not be reached from this browser. Check the S3 CORS policy for this dashboard origin and your connection, then retry.");
+        } else if (axios.isAxiosError(error) && error.response?.status === 403) {
+          failed("Storage rejected the upload (403). The signed link may have expired; retry for a fresh link.");
+        } else {
+          failed("Upload to storage failed. Please retry or contact an administrator.");
+        }
         throw error;
       }
 
