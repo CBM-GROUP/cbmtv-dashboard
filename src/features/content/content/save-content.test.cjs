@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- node:test uses this CommonJS harness to register ts-node before loading save-content.ts. */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
