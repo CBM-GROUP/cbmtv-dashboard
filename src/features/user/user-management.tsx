@@ -1,13 +1,13 @@
 import { CONFIG } from 'src/config-global';
 
-import { ProfileView } from 'src/features/user/user/view';
+import { UserManagementView } from 'src/features/user/user/view/user-management-view';
 
 export default function Page() {
   return (
     <>
       <title>{`User Management - ${CONFIG.appName}`}</title>
 
-      <ProfileView />
+      <UserManagementView />
     </>
   );
 }

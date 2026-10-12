@@ -7,7 +7,7 @@ export type NavItem = {
   path: string;
   icon: React.ReactNode;
   info?: React.ReactNode;
-  adminOnly?: boolean;
+  permission?: 'channels' | 'content' | 'adverts' | 'settings' | 'users' | 'analytics';
 };
 
 export const navData = [
@@ -15,34 +15,38 @@ export const navData = [
     title: 'Dashboard',
     path: '/',
     icon: <MdDashboard />,
+    permission: 'analytics',
   },
 
   {
     title: 'Channels',
     path: '/channel-list',
     icon: <BsDisplayFill />,
+    permission: 'channels',
   },
   {
     title: 'Content',
     path: '/content-list',
     icon: <BiSolidVideos />,
+    permission: 'content',
   },
   {
     title: 'Adverts',
     path: '/advert-list',
     icon: <BsMegaphoneFill />,
+    permission: 'adverts',
   },
   {
     title: 'Settings',
     path: '/settings',
     icon: <BsGearFill />,
-    adminOnly: true,
+    permission: 'settings',
   },
   {
     title: 'User Management',
     path: '/user-management',
     icon: <BsFillPeopleFill />,
-    adminOnly: true,
+    permission: 'users',
   },
   {
     title: 'Profile',

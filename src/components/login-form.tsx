@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff } from "lucide-react"
+import axios from "axios"
 import { cn } from "cn"
 
 import { useAuth } from "@/features/auth/context"
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/card"
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -44,8 +44,14 @@ export function LoginForm({
     try {
       await login(email.trim(), password)
       router.replace("/")
-    } catch {
-      setError("Failed to sign in. Please check your credentials.")
+    } catch (failure) {
+      setError(
+        axios.isAxiosError(failure) && failure.response?.data?.code === "activation_required"
+          ? "Activate your account with the temporary PIN before signing in."
+          : failure instanceof Error && failure.message.includes("dashboard access")
+            ? failure.message
+            : "Failed to sign in. Please check your credentials."
+      )
     } finally {
       setLoading(false)
     }
@@ -111,6 +117,11 @@ export function LoginForm({
                 <Button type="submit" disabled={loading}>
                   {loading ? "Signing in..." : "Login"}
                 </Button>
+              </Field>
+              <Field>
+                <Link href="/activate" className="text-sm text-primary underline underline-offset-4">
+                  Have a temporary PIN? Activate your account
+                </Link>
               </Field>
             </FieldGroup>
           </form>
