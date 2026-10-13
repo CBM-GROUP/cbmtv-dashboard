@@ -11,6 +11,11 @@ interface User {
   name: string;
   role?: string;
   is_staff?: boolean;
+  is_superuser?: boolean;
+  is_active?: boolean;
+  must_change_password?: boolean;
+  dashboard_role?: number | null;
+  dashboard_permissions?: string[];
   image?: string;
   displayName?: string;
   phone?: string;
@@ -31,6 +36,9 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuth = () => useContext(AuthContext);
 
+export const hasDashboardAccess = (user: User | null) =>
+  Boolean(user && user.is_active !== false && !user.must_change_password && (user.is_staff || user.is_superuser || user.dashboard_role));
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +57,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         currentUser = profile.data;
       } catch (error) {
         console.error('Failed to fetch user profile', error);
+      }
+
+      if (!hasDashboardAccess(currentUser)) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        throw new Error('This account does not have dashboard access.');
       }
 
       setUser(currentUser);
@@ -82,14 +96,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('user', JSON.stringify(response.data));
     } catch (error) {
       console.error('Failed to fetch user', error);
-      const cachedUser = localStorage.getItem('user');
-      if (cachedUser) {
-        try {
-          setUser(JSON.parse(cachedUser));
-        } catch {
-          localStorage.removeItem('user');
-        }
-      }
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+      setUser(null);
     }
   }, []);
 

@@ -103,10 +103,7 @@ export function NavContent({ data, slots, sx }: NavContentProps) {
   const pathname = usePathname();
 
   const navData = data.filter((item) => {
-    if (item.adminOnly && user?.role !== "admin") {
-      return false;
-    }
-    return true;
+    return !item.permission || user?.is_superuser || user?.dashboard_permissions?.includes(item.permission);
   });
 
   return (

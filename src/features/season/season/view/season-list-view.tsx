@@ -22,6 +22,7 @@ import { DataTablePagination } from "@/components/data-table-pagination";
 import { PageHeader, PageShell } from "@/components/page-shell";
 
 import apiClient from "src/services/api";
+import { fetchAllPages } from "src/services/fetchAllPages";
 
 interface Season {
   id: string;
@@ -44,10 +45,9 @@ export function SeasonListView() {
 
   const fetchSeasons = async () => {
     try {
-      const response = await apiClient.get(
-        `/api/content/seasons/?content=${contentId}`
-      );
-      setSeasons(response.data);
+      setSeasons(await fetchAllPages<Season>(
+        apiClient, `/api/content/seasons/?content=${contentId}&scope=dashboard`,
+      ));
     } catch (error) {
       console.error("Failed to fetch seasons", error);
     }
