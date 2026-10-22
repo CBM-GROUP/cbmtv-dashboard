@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import axios from "axios";
 
 import apiClient from "@/services/api";
+import { uploadMultipartVideo } from "./multipart-video";
 
 export type MediaType = "video" | "image";
 
@@ -72,6 +73,7 @@ const UploadManagerContext = createContext<UploadManagerValue | null>(null);
 // credentials stay server-side in one place. apiClient attaches the bearer
 // token and refreshes it on 401, so no manual retry is needed here.
 const UPLOAD_TARGET_URL = "/api/content/media/upload-target/";
+const MULTIPART_THRESHOLD = 32 * 1024 * 1024;
 
 interface UploadTargetResponse {
   upload_url: string;
@@ -95,6 +97,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   // are what make retry possible after a presigned URL expires.
   const controllers = useRef(new Map<string, AbortController>());
   const files = useRef(new Map<string, File>());
+  const uploadedUrls = useRef(new Map<string, string>());
   const listeners = useRef(new Set<(job: UploadJob) => void>());
   const nextId = useRef(0);
 
@@ -127,61 +130,48 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         patchJob(jobId, { status: "error", error: message });
       };
 
-      patchJob(jobId, { status: "presigning", progress: 0, error: "" });
-
-      let target: UploadTargetResponse;
-      try {
-        const response = await apiClient.post<UploadTargetResponse>(
-          UPLOAD_TARGET_URL,
-          {
-            filename: file.name,
-            content_type: file.type,
-            media_type: mediaType,
-            // The backend sizes the presigned URL's lifetime to this, so a
-            // large file is not handed a window it cannot finish inside.
-            size_bytes: file.size,
-          },
-          { signal: controller.signal },
-        );
-        target = response.data;
-      } catch (error) {
-        const message =
-          (axios.isAxiosError(error) && error.response?.data?.error) ||
-          "Could not start the upload. Please try again.";
-        failed(message);
-        throw error;
+      let deliveryUrl = uploadedUrls.current.get(jobId);
+      if (!deliveryUrl) {
+        patchJob(jobId, { status: "presigning", progress: 0, error: "" });
+        try {
+          if (mediaType === "video" && file.size >= MULTIPART_THRESHOLD) {
+            patchJob(jobId, { status: "uploading" });
+            deliveryUrl = await uploadMultipartVideo(file, controller.signal, (progress) => patchJob(jobId, { progress }));
+          } else {
+            const response = await apiClient.post<UploadTargetResponse>(UPLOAD_TARGET_URL, {
+              filename: file.name,
+              content_type: file.type,
+              media_type: mediaType,
+              size_bytes: file.size,
+            }, { signal: controller.signal });
+            const target = response.data;
+            patchJob(jobId, { status: "uploading" });
+            // S3 never receives the dashboard bearer token.
+            await axios.put(target.upload_url, file, {
+              headers: target.headers,
+              transformRequest: [(body) => body],
+              signal: controller.signal,
+              onUploadProgress: ({ loaded, total }) => {
+                if (total) patchJob(jobId, { progress: Math.round((loaded / total) * 100) });
+              },
+            });
+            deliveryUrl = target.delivery_url;
+          }
+          uploadedUrls.current.set(jobId, deliveryUrl);
+        } catch (error) {
+          failed((axios.isAxiosError(error) && error.response?.data?.error) || "Upload failed. Retry to continue.");
+          throw error;
+        }
       }
 
-      patchJob(jobId, { status: "uploading" });
-
-      try {
-        // Sent straight to S3, so this must not carry the API's Authorization
-        // header -- hence bare axios rather than apiClient.
-        await axios.put(target.upload_url, file, {
-          headers: target.headers,
-          transformRequest: [(body) => body],
-          signal: controller.signal,
-          onUploadProgress: ({ loaded, total }) => {
-            if (total) patchJob(jobId, { progress: Math.round((loaded / total) * 100) });
-          },
-        });
-      } catch (error) {
-        const minutes = Math.round((target.expires_in ?? 3600) / 60);
-        failed(
-          `Upload to storage failed. The upload link was valid for ${minutes} minutes -- retry to get a fresh one.`,
-        );
-        throw error;
-      }
-
-      patchJob(jobId, { progress: 100, deliveryUrl: target.delivery_url });
+      patchJob(jobId, { progress: 100, deliveryUrl });
 
       if (attach) {
         patchJob(jobId, { status: "attaching" });
         try {
-          await apiClient.patch(attach.endpoint, { [attach.field]: target.delivery_url });
+          await apiClient.patch(attach.endpoint, { [attach.field]: deliveryUrl }, { signal: controller.signal });
         } catch (error) {
-          // The file is in S3 and the URL is on the job, so this is recoverable:
-          // retry re-uploads, or the URL can be copied out of the tray.
+          // The file is in S3 and the URL is retained for an attachment-only retry.
           failed("Uploaded, but saving the link to the record failed. Retry or copy the URL.");
           throw error;
         }
@@ -189,6 +179,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
       patchJob(jobId, { status: "success" });
       controllers.current.delete(jobId);
+      files.current.delete(jobId);
+      uploadedUrls.current.delete(jobId);
 
       if (attach) {
         const finished: UploadJob = {
@@ -199,13 +191,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           status: "success",
           progress: 100,
           error: "",
-          deliveryUrl: target.delivery_url,
+          deliveryUrl,
           attach,
         };
         listeners.current.forEach((listener) => listener(finished));
       }
 
-      return target.delivery_url;
+      return deliveryUrl;
     },
     [patchJob],
   );
@@ -262,12 +254,14 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     controllers.current.get(jobId)?.abort();
     controllers.current.delete(jobId);
     files.current.delete(jobId);
+    uploadedUrls.current.delete(jobId);
     setJobs((previous) => previous.filter((job) => job.id !== jobId));
   }, []);
 
   const dismissFinished = useCallback(() => {
     setJobs((previous) => {
       previous.filter((job) => !isActive(job)).forEach((job) => files.current.delete(job.id));
+      previous.filter((job) => !isActive(job)).forEach((job) => uploadedUrls.current.delete(job.id));
       return previous.filter(isActive);
     });
   }, []);
