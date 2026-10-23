@@ -64,6 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
     setUser(null);
   }, []);
 
@@ -82,14 +83,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('user', JSON.stringify(response.data));
     } catch (error) {
       console.error('Failed to fetch user', error);
-      const cachedUser = localStorage.getItem('user');
-      if (cachedUser) {
-        try {
-          setUser(JSON.parse(cachedUser));
-        } catch {
-          localStorage.removeItem('user');
-        }
-      }
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+      setUser(null);
     }
   }, []);
 
