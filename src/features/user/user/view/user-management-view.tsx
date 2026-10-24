@@ -1,115 +1,276 @@
-import { useState, useEffect } from 'react';
+'use client';
 
-import { Card } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import { DataTablePagination } from '@/components/data-table-pagination';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import axios from 'axios';
+
+import { useAuth } from '@/features/auth/context';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { FormField } from '@/components/form-field';
 import { PageHeader, PageShell } from '@/components/page-shell';
+import {
+  dashboardAccessService,
+  type DashboardRole,
+  type DashboardSection,
+  type DashboardUser,
+} from '@/services/dashboardAccessService';
 
-import apiClient from 'src/services/api';
+const SECTIONS: { value: DashboardSection; label: string }[] = [
+  { value: 'channels', label: 'Channels' },
+  { value: 'content', label: 'Content and episodes' },
+  { value: 'adverts', label: 'Adverts' },
+  { value: 'settings', label: 'Settings' },
+  { value: 'users', label: 'User Management' },
+];
 
-import { useAuth } from 'src/features/auth/context';
+function errorMessage(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (typeof data?.detail === 'string') return data.detail;
+    if (data && typeof data === 'object') {
+      const first = Object.values(data).flat().find((item) => typeof item === 'string');
+      if (typeof first === 'string') return first;
+    }
+  }
+  return 'The request failed. Please try again.';
+}
 
-import { UserTableRow } from '../user-table-row';
-import { UserTableHead } from '../user-table-head';
+function PermissionPicker({ value, onChange }: {
+  value: DashboardSection[];
+  onChange: (next: DashboardSection[]) => void;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {SECTIONS.map((section) => (
+        <label key={section.value} className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={value.includes(section.value)}
+            onCheckedChange={(checked) => onChange(
+              checked === true ? [...value, section.value] : value.filter((item) => item !== section.value)
+            )}
+          />
+          {section.label}
+        </label>
+      ))}
+    </div>
+  );
+}
 
-import type { UserProps } from '../user-table-row';
+function RoleEditor({ role, onSave }: {
+  role: DashboardRole;
+  onSave: (role: DashboardRole, permissions: DashboardSection[]) => Promise<void>;
+}) {
+  const [permissions, setPermissions] = useState(role.permissions);
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <div className="grid gap-3 rounded-lg border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <strong>{role.name}</strong>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={saving || permissions.join(',') === role.permissions.join(',')}
+          onClick={async () => {
+            setSaving(true);
+            try { await onSave(role, permissions); } finally { setSaving(false); }
+          }}
+        >
+          {saving ? 'Saving…' : 'Save permissions'}
+        </Button>
+      </div>
+      <PermissionPicker value={permissions} onChange={setPermissions} />
+    </div>
+  );
+}
 
 export function UserManagementView() {
   const { user } = useAuth()!;
-  const [users, setUsers] = useState<UserProps[]>([]);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [roles, setRoles] = useState<DashboardRole[]>([]);
+  const [users, setUsers] = useState<DashboardUser[]>([]);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [roleId, setRoleId] = useState('');
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRolePermissions, setNewRolePermissions] = useState<DashboardSection[]>([]);
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const fetchUsers = async () => {
+  const load = useCallback(async () => {
     try {
-      const response = await apiClient.get('/api/accounts/users/');
-      setUsers(response.data);
+      const [nextRoles, nextUsers] = await Promise.all([
+        dashboardAccessService.roles(), dashboardAccessService.users(),
+      ]);
+      setRoles(nextRoles);
+      setUsers(nextUsers);
+      setRoleId((previous) => previous || String(nextRoles[0]?.id || ''));
     } catch (error) {
-      console.error('Failed to fetch users', error);
+      setMessage(errorMessage(error));
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchUsers();
-    }
-  }, [user]);
+  useEffect(() => { void load(); }, [load]);
 
-  const handleAssignAdmin = async (userId: string) => {
+  const assignableRoles = roles.filter((role) =>
+    user?.is_staff || user?.is_superuser || role.permissions.every((section) => user?.dashboard_permissions?.includes(section))
+  );
+  const roleItems = assignableRoles.map((role) => ({ value: String(role.id), label: role.name }));
+
+  const invite = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!roleId) return;
+    setBusy(true);
+    setMessage('');
     try {
-      await apiClient.post('/api/accounts/assign-admin/', { user_id: userId, role: 'admin' });
-      // Refresh the user list
-      fetchUsers();
+      await dashboardAccessService.invite(name.trim(), email.trim(), Number(roleId));
+      setName('');
+      setEmail('');
+      setMessage('Invitation emailed. The user must set a password before signing in.');
+      await load();
     } catch (error) {
-      console.error('Failed to assign admin role', error);
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleDemoteAdmin = async (userId: string) => {
+  const createRole = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage('');
     try {
-      await apiClient.post('/api/accounts/assign-admin/', { user_id: userId, role: 'User' });
-      // Refresh the user list
-      fetchUsers();
+      await dashboardAccessService.createRole(newRoleName.trim(), newRolePermissions);
+      setNewRoleName('');
+      setNewRolePermissions([]);
+      setMessage('Role created.');
+      await load();
     } catch (error) {
-      console.error('Failed to assign admin role', error);
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleChangeRowsPerPage = (value: number) => {
-    setRowsPerPage(value);
-    setPage(0);
+  const savePermissions = async (role: DashboardRole, permissions: DashboardSection[]) => {
+    try {
+      await dashboardAccessService.updateRole(role.id, permissions);
+      setMessage(`Permissions saved for ${role.name}.`);
+      await load();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
   };
-
-  const rows = users.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <PageShell>
-      <PageHeader title="User Management" description="Grant or revoke admin access." />
-      <Card className="gap-0 py-0">
-        <Table className="min-w-[640px]">
-          <UserTableHead
-            order="asc"
-            orderBy="name"
-            rowCount={users.length}
-            numSelected={0}
-            onSort={() => {}}
-            onSelectAllRows={() => {}}
-            headLabel={[
-              { id: 'name', label: 'Name' },
-              { id: 'email', label: 'Email' },
-              { id: 'role', label: 'Role' },
-              { id: '', label: '' },
-            ]}
-          />
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                  No users found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
-                <UserTableRow
-                  key={row.id}
-                  row={row}
-                  selected={false}
-                  onSelectRow={() => {}}
-                  onAssignAdmin={() => handleAssignAdmin(row.id)}
-                  onDemoteAdmin={() => handleDemoteAdmin(row.id)}
-                />
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <PageHeader title="User Management" description="Create dashboard accounts and assign access through roles." />
+      {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
 
-        <DataTablePagination
-          count={users.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={setPage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Invite a user</CardTitle>
+            <CardDescription>A temporary letter-and-number PIN is emailed to the user. It expires after 24 hours.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={invite} className="grid gap-4">
+              <FormField label="Name" htmlFor="invite-name">
+                <Input id="invite-name" value={name} onChange={(event) => setName(event.target.value)} required />
+              </FormField>
+              <FormField label="Email" htmlFor="invite-email">
+                <Input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              </FormField>
+              <FormField label="Role" htmlFor="invite-role">
+                <Select items={roleItems} value={roleId || null} onValueChange={(value) => setRoleId(value || '')}>
+                  <SelectTrigger id="invite-role" className="w-full"><SelectValue placeholder="Choose a role" /></SelectTrigger>
+                  <SelectContent>{roleItems.map((role) => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <Button type="submit" disabled={busy || !roleId}>Email invitation</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Roles and permissions</CardTitle>
+            <CardDescription>Permissions control the sidebar and the matching backend write APIs.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {user?.is_superuser && (
+              <form onSubmit={createRole} className="grid gap-3 rounded-lg border p-4">
+                <FormField label="New role name" htmlFor="role-name">
+                  <Input id="role-name" value={newRoleName} onChange={(event) => setNewRoleName(event.target.value)} required />
+                </FormField>
+                <PermissionPicker value={newRolePermissions} onChange={setNewRolePermissions} />
+                <Button type="submit" disabled={busy} className="w-fit">Create role</Button>
+              </form>
+            )}
+            {roles.length === 0 && <p className="text-sm text-muted-foreground">Create a role before inviting users.</p>}
+            {roles.map((role) => user?.is_superuser ? (
+              <RoleEditor key={role.id} role={role} onSave={savePermissions} />
+            ) : (
+              <div key={role.id} className="rounded-lg border p-4 text-sm">
+                <strong>{role.name}</strong>
+                <p className="text-muted-foreground">{role.permissions.map((section) => SECTIONS.find((item) => item.value === section)?.label).join(', ') || 'Dashboard overview only'}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="gap-0 py-0">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[680px]">
+            <TableHeader><TableRow>
+              <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {users.map((account) => (
+                <TableRow key={account.id}>
+                  <TableCell>{account.name}</TableCell>
+                  <TableCell>{account.email}</TableCell>
+                  <TableCell>
+                    {account.dashboard_role ? (
+                      <Select
+                        items={roleItems}
+                        value={String(account.dashboard_role)}
+                        onValueChange={async (value) => {
+                          if (!value) return;
+                          try {
+                            await dashboardAccessService.assignRole(account.id, Number(value));
+                            setMessage(`Role updated for ${account.name}.`);
+                            await load();
+                          } catch (error) { setMessage(errorMessage(error)); }
+                        }}
+                      >
+                        <SelectTrigger aria-label={`Role for ${account.name}`}><SelectValue /></SelectTrigger>
+                        <SelectContent>{roleItems.map((role) => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : account.is_superuser ? 'Superuser' : account.role}
+                  </TableCell>
+                  <TableCell>{account.must_change_password ? 'Awaiting password setup' : 'Active'}</TableCell>
+                  <TableCell>
+                    {account.must_change_password && (
+                      <Button variant="outline" size="sm" onClick={async () => {
+                        try {
+                          await dashboardAccessService.resendInvite(account.id);
+                          setMessage(`A new PIN was emailed to ${account.email}.`);
+                        } catch (error) { setMessage(errorMessage(error)); }
+                      }}>Resend PIN</Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {users.length === 0 && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No dashboard users yet.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
     </PageShell>
   );

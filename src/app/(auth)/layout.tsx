@@ -9,7 +9,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
     <GuestGuard>
-      {pathname === "/sign-in" ? children : <AuthLayout>{children}</AuthLayout>}
+      {pathname === "/sign-in" || pathname === "/activate" ? children : <AuthLayout>{children}</AuthLayout>}
     </GuestGuard>
   );
 }

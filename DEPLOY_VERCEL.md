@@ -53,3 +53,23 @@ belong in the backend's environment only.
   project owner. GitHub merge commits can be authored by the account that merges
   the pull request, even when the branch commits have a different author. Merge
   into the production branch with the GitHub account linked to the project owner.
+
+8) Planned development and production workflow (not yet configured)
+- Keep the `klouisphillip256` Vercel project as production, deploying dashboard
+  `main`. Use the `cbmtvmedia` Vercel project for development, deploying a future
+  `develop` branch from the same GitHub repository.
+- Develop on feature branches, merge reviewed changes into `develop`, and promote
+  tested changes to `main` through a pull request. Restrict merges into `main`
+  to the `klouisphillip256` GitHub account using repository branch protection.
+- The `cbmtvmedia` Vercel project is currently a CLI deployment of the same
+  committed `main` revision as production. Its Git integration, the `develop`
+  branch, and branch protection still need to be set up. Do not assume a push to
+  `develop` will deploy it until the integration is verified.
+- Later, create a separate Cloudflare R2 Standard bucket for development media.
+  R2 has an ongoing monthly free allowance and an S3-compatible API. Keep both
+  dashboard deployments on Vercel; the development backend will need its own R2
+  credentials, bucket, S3 endpoint setting, public media URL, and bucket CORS
+  rules for browser uploads. Verify presigned PUT uploads and image delivery
+  before pointing development traffic at the bucket.
+- Until the development backend and storage are separated, the development
+  dashboard can still affect production data. Treat the R2 setup as future work.
