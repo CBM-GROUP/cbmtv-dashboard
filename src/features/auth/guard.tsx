@@ -8,6 +8,7 @@ import { useRouter } from '@/hooks';
 import { hasDashboardAccess, useAuth } from './context';
 
 function requiredSection(pathname: string) {
+  if (pathname === '/') return 'analytics';
   if (pathname.startsWith('/channel-list')) return 'channels';
   if (pathname.startsWith('/content-list') || pathname.startsWith('/content/') || pathname.startsWith('/season/')) return 'content';
   if (pathname.startsWith('/advert-list')) return 'adverts';
@@ -22,15 +23,19 @@ export const AuthGuard = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
   const hasAccess = hasDashboardAccess(user);
   const section = requiredSection(pathname);
-  const canOpen = !section || Boolean(user?.is_staff || user?.is_superuser || user?.dashboard_permissions?.includes(section));
+  const canOpen = !section || Boolean(user?.is_superuser || user?.dashboard_permissions?.includes(section));
+  const fallback = [
+    ['channels', '/channel-list'], ['content', '/content-list'], ['adverts', '/advert-list'],
+    ['settings', '/settings'], ['users', '/user-management'],
+  ].find(([permission]) => user?.dashboard_permissions?.includes(permission))?.[1] ?? '/user';
 
   useEffect(() => {
     if (!loading && !hasAccess) {
       router.push('/sign-in');
     } else if (!loading && !canOpen) {
-      router.push('/');
+      router.push(fallback);
     }
-  }, [hasAccess, canOpen, loading, router]);
+  }, [hasAccess, canOpen, fallback, loading, router]);
 
   if (loading || !hasAccess || !canOpen) {
     return (

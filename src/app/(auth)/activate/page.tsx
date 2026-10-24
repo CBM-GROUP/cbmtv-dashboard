@@ -47,7 +47,7 @@ export default function ActivatePage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Activate your dashboard account</CardTitle>
-          <CardDescription>Use the temporary PIN in your invitation email, then choose your own password.</CardDescription>
+          <CardDescription>Use the temporary PIN provided by your administrator, then choose your own password.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-5">
           {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}

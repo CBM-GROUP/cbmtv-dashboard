@@ -1,6 +1,6 @@
 import apiClient from './api';
 
-export type DashboardSection = 'channels' | 'content' | 'adverts' | 'settings' | 'users';
+export type DashboardSection = 'channels' | 'content' | 'adverts' | 'settings' | 'users' | 'analytics';
 
 export type DashboardRole = {
   id: number;
@@ -17,15 +17,22 @@ export type DashboardUser = {
   dashboard_role: number | null;
   dashboard_role_name: string | null;
   must_change_password: boolean;
+  is_active: boolean;
+  dashboard_status: 'active' | 'inactive' | 'invited' | 'pending_activation';
+  phone?: string | null;
+  location?: string | null;
+  country?: string | null;
 };
+
+export type InvitationResult = DashboardUser & { temporary_pin: string };
 
 export const dashboardAccessService = {
   async roles() {
     const response = await apiClient.get<DashboardRole[]>('/api/accounts/dashboard-roles/');
     return response.data;
   },
-  async users() {
-    const response = await apiClient.get<DashboardUser[]>('/api/accounts/dashboard-users/');
+  async users(search = '') {
+    const response = await apiClient.get<DashboardUser[]>('/api/accounts/dashboard-users/', { params: { search } });
     return response.data;
   },
   async createRole(name: string, permissions: DashboardSection[]) {
@@ -37,7 +44,7 @@ export const dashboardAccessService = {
     return response.data;
   },
   async invite(name: string, email: string, dashboardRole: number) {
-    const response = await apiClient.post<DashboardUser>('/api/accounts/dashboard-users/', {
+    const response = await apiClient.post<InvitationResult>('/api/accounts/dashboard-users/', {
       name, email, dashboard_role: dashboardRole,
     });
     return response.data;
@@ -48,8 +55,13 @@ export const dashboardAccessService = {
     });
     return response.data;
   },
+  async updateUser(userId: number, changes: Partial<Pick<DashboardUser, 'name' | 'email' | 'phone' | 'location' | 'country' | 'dashboard_role' | 'is_active'>>) {
+    const response = await apiClient.patch<DashboardUser>(`/api/accounts/dashboard-users/${userId}/`, changes);
+    return response.data;
+  },
   async resendInvite(userId: number) {
-    await apiClient.post(`/api/accounts/dashboard-users/${userId}/resend-invite/`);
+    const response = await apiClient.post<{ temporary_pin: string }>(`/api/accounts/dashboard-users/${userId}/resend-invite/`);
+    return response.data;
   },
   async activate(email: string, temporaryPin: string, newPassword: string) {
     await apiClient.post('/api/accounts/dashboard-activate/', {

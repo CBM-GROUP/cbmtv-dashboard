@@ -10,8 +10,8 @@ import { normalizeListResponse } from './normalizeListResponse';
  * every list view here used to do — silently truncates the table while the row
  * count still looks complete.
  *
- * `next` comes back as an absolute URL built from the request host, so it is
- * passed to axios as-is rather than through the client's baseURL.
+ * `next` may be an absolute backend URL. Keep its path and query so browser
+ * requests continue through the dashboard API proxy with their read scope.
  */
 export async function fetchAllPages<T>(
   client: AxiosInstance,
@@ -27,7 +27,12 @@ export async function fetchAllPages<T>(
     items.push(...normalizeListResponse<T>(response.data));
 
     const body = response.data as { next?: unknown } | null;
-    url = body && typeof body === 'object' && typeof body.next === 'string' ? body.next : null;
+    if (body && typeof body === 'object' && typeof body.next === 'string') {
+      const next = new URL(body.next, 'http://backend.local');
+      url = `${next.pathname}${next.search}`;
+    } else {
+      url = null;
+    }
     pages += 1;
   }
 

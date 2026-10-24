@@ -159,7 +159,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           }
           uploadedUrls.current.set(jobId, deliveryUrl);
         } catch (error) {
-          failed((axios.isAxiosError(error) && error.response?.data?.error) || "Upload failed. Retry to continue.");
+          if (axios.isAxiosError(error) && !error.response) {
+            failed("Storage could not be reached from this browser. Check the S3 CORS policy for this dashboard origin and your connection, then retry.");
+          } else if (axios.isAxiosError(error) && error.response?.status === 403) {
+            failed("Storage rejected the upload (403). The signed link may have expired; retry for a fresh link.");
+          } else {
+            failed((axios.isAxiosError(error) && error.response?.data?.error) || "Upload failed. Retry to continue.");
+          }
           throw error;
         }
       }

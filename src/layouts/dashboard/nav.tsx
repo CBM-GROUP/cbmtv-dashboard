@@ -102,13 +102,9 @@ export function NavContent({ data, slots, sx }: NavContentProps) {
   const { user } = useAuth()!;
   const pathname = usePathname();
 
-  const navData = data.filter(
-    (item) =>
-      !item.permission ||
-      user?.is_staff ||
-      user?.is_superuser ||
-      user?.dashboard_permissions?.includes(item.permission),
-  );
+  const navData = data.filter((item) => {
+    return !item.permission || user?.is_superuser || user?.dashboard_permissions?.includes(item.permission);
+  });
 
   return (
     <>

@@ -12,6 +12,8 @@ interface User {
   role?: string;
   is_staff?: boolean;
   is_superuser?: boolean;
+  is_active?: boolean;
+  must_change_password?: boolean;
   dashboard_role?: number | null;
   dashboard_permissions?: string[];
   image?: string;
@@ -35,7 +37,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const useAuth = () => useContext(AuthContext);
 
 export const hasDashboardAccess = (user: User | null) =>
-  Boolean(user && (user.is_staff || user.is_superuser || user.dashboard_role));
+  Boolean(user && user.is_active !== false && !user.must_change_password && (user.is_staff || user.is_superuser || user.dashboard_role));
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);

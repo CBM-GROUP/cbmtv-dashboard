@@ -7,7 +7,7 @@ export type NavItem = {
   path: string;
   icon: React.ReactNode;
   info?: React.ReactNode;
-  permission?: 'channels' | 'content' | 'adverts' | 'settings' | 'users';
+  permission?: 'channels' | 'content' | 'adverts' | 'settings' | 'users' | 'analytics';
 };
 
 export const navData = [
@@ -15,6 +15,7 @@ export const navData = [
     title: 'Dashboard',
     path: '/',
     icon: <MdDashboard />,
+    permission: 'analytics',
   },
 
   {

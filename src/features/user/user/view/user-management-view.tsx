@@ -20,6 +20,7 @@ import {
 } from '@/services/dashboardAccessService';
 
 const SECTIONS: { value: DashboardSection; label: string }[] = [
+  { value: 'analytics', label: 'Analytics' },
   { value: 'channels', label: 'Channels' },
   { value: 'content', label: 'Content and episodes' },
   { value: 'adverts', label: 'Adverts' },
@@ -100,6 +101,9 @@ export function UserManagementView() {
   const [newRolePermissions, setNewRolePermissions] = useState<DashboardSection[]>([]);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState<DashboardUser | null>(null);
+  const [pinReveal, setPinReveal] = useState<{ email: string; pin: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -117,7 +121,7 @@ export function UserManagementView() {
   useEffect(() => { void load(); }, [load]);
 
   const assignableRoles = roles.filter((role) =>
-    user?.is_staff || user?.is_superuser || role.permissions.every((section) => user?.dashboard_permissions?.includes(section))
+    user?.is_superuser || role.permissions.every((section) => user?.dashboard_permissions?.includes(section))
   );
   const roleItems = assignableRoles.map((role) => ({ value: String(role.id), label: role.name }));
 
@@ -127,10 +131,11 @@ export function UserManagementView() {
     setBusy(true);
     setMessage('');
     try {
-      await dashboardAccessService.invite(name.trim(), email.trim(), Number(roleId));
+      const invited = await dashboardAccessService.invite(name.trim(), email.trim(), Number(roleId));
+      setPinReveal({ email: invited.email, pin: invited.temporary_pin });
       setName('');
       setEmail('');
-      setMessage('Invitation emailed. The user must set a password before signing in.');
+      setMessage('Invitation created. Share the temporary PIN securely; it will not be shown again.');
       await load();
     } catch (error) {
       setMessage(errorMessage(error));
@@ -170,12 +175,20 @@ export function UserManagementView() {
     <PageShell>
       <PageHeader title="User Management" description="Create dashboard accounts and assign access through roles." />
       {message && <p role="status" className="rounded-lg border p-3 text-sm">{message}</p>}
+      {pinReveal && (
+        <div role="status" className="rounded-lg border p-4 text-sm">
+          <strong>One-time activation PIN for {pinReveal.email}</strong>
+          <p className="mt-2 font-mono text-lg select-all">{pinReveal.pin}</p>
+          <p>Share this PIN securely with the invited user. It expires after 24 hours.</p>
+          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setPinReveal(null)}>I have saved the PIN</Button>
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Invite a user</CardTitle>
-            <CardDescription>A temporary letter-and-number PIN is emailed to the user. It expires after 24 hours.</CardDescription>
+            <CardDescription>Create an account and securely share its one-time PIN. It expires after 24 hours. Email delivery is not required.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={invite} className="grid gap-4">
@@ -191,7 +204,7 @@ export function UserManagementView() {
                   <SelectContent>{roleItems.map((role) => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
-              <Button type="submit" disabled={busy || !roleId}>Email invitation</Button>
+              <Button type="submit" disabled={busy || !roleId}>Create invitation</Button>
             </form>
           </CardContent>
         </Card>
@@ -224,6 +237,37 @@ export function UserManagementView() {
         </Card>
       </div>
 
+      {editing && (
+        <Card>
+          <CardHeader><CardTitle>Edit {editing.name}</CardTitle></CardHeader>
+          <CardContent>
+            <form className="grid gap-3 sm:grid-cols-2" onSubmit={async (event) => {
+              event.preventDefault();
+              try {
+                await dashboardAccessService.updateUser(editing.id, {
+                  name: editing.name, email: editing.email, phone: editing.phone,
+                  location: editing.location, country: editing.country,
+                });
+                setEditing(null);
+                setMessage('User details updated.');
+                await load();
+              } catch (error) { setMessage(errorMessage(error)); }
+            }}>
+              {(['name', 'email', 'phone', 'location', 'country'] as const).map((field) => (
+                <FormField key={field} label={field[0].toUpperCase() + field.slice(1)} htmlFor={`edit-${field}`}>
+                  <Input id={`edit-${field}`} type={field === 'email' ? 'email' : 'text'} value={editing[field] || ''}
+                    onChange={(event) => setEditing({ ...editing, [field]: event.target.value })} required={field === 'name' || field === 'email'} />
+                </FormField>
+              ))}
+              <div className="flex items-end gap-2"><Button type="submit">Save details</Button><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button></div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <FormField label="Search dashboard users" htmlFor="user-search">
+        <Input id="user-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name or email" />
+      </FormField>
       <Card className="gap-0 py-0">
         <div className="overflow-x-auto">
           <Table className="min-w-[680px]">
@@ -231,7 +275,7 @@ export function UserManagementView() {
               <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {users.map((account) => (
+              {users.filter((account) => `${account.name} ${account.email}`.toLowerCase().includes(search.toLowerCase())).map((account) => (
                 <TableRow key={account.id}>
                   <TableCell>{account.name}</TableCell>
                   <TableCell>{account.email}</TableCell>
@@ -254,16 +298,28 @@ export function UserManagementView() {
                       </Select>
                     ) : account.is_superuser ? 'Superuser' : account.role}
                   </TableCell>
-                  <TableCell>{account.must_change_password ? 'Awaiting password setup' : 'Active'}</TableCell>
+                  <TableCell>{({ active: 'Active', inactive: 'Inactive', invited: 'Invited', pending_activation: 'Pending activation' })[account.dashboard_status]}</TableCell>
                   <TableCell>
-                    {account.must_change_password && (
+                    <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setEditing(account)}>Edit</Button>
+                    {account.id !== user?.id && <Button variant="outline" size="sm" onClick={async () => {
+                      try {
+                        await dashboardAccessService.updateUser(account.id, { is_active: !account.is_active });
+                        setMessage(`${account.name} ${account.is_active ? 'deactivated' : 'reactivated'}.`);
+                        await load();
+                      } catch (error) { setMessage(errorMessage(error)); }
+                    }}>{account.is_active ? 'Deactivate' : 'Reactivate'}</Button>}
+                    {account.must_change_password && account.is_active && (
                       <Button variant="outline" size="sm" onClick={async () => {
                         try {
-                          await dashboardAccessService.resendInvite(account.id);
-                          setMessage(`A new PIN was emailed to ${account.email}.`);
+                          const issued = await dashboardAccessService.resendInvite(account.id);
+                          setPinReveal({ email: account.email, pin: issued.temporary_pin });
+                          setMessage('A new PIN was issued. The previous PIN is no longer valid.');
+                          await load();
                         } catch (error) { setMessage(errorMessage(error)); }
-                      }}>Resend PIN</Button>
+                      }}>Reissue PIN</Button>
                     )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
