@@ -55,8 +55,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const profile = await apiClient.get<User>('/api/accounts/profile/');
         currentUser = profile.data;
-      } catch (error) {
-        console.error('Failed to fetch user profile', error);
+      } catch {
+        console.error('Failed to fetch user profile.');
       }
 
       if (!hasDashboardAccess(currentUser)) {
@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return currentUser;
     } catch (error) {
-      console.error('Login failed', error);
+      console.error('Login failed.');
       throw error;
     }
   }, []);
@@ -85,8 +85,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = useCallback(async (formData: Record<string, string>) => {
     try {
       await axios.post('/api/accounts/register', formData);
-    } catch (error) {
-      console.error('Registration failed', error);
+    } catch {
+      console.error('Registration failed.');
     }
   }, []);
 
@@ -95,8 +95,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response = await apiClient.get<User>('/api/accounts/profile/');
       setUser(response.data);
       localStorage.setItem('user', JSON.stringify(response.data));
-    } catch (error) {
-      console.error('Failed to fetch user', error);
+    } catch {
+      console.error('Failed to fetch user.');
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');

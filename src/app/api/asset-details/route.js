@@ -17,8 +17,8 @@ export async function GET(request) {
   try {
     const asset = await video.assets.retrieve(assetId);
     return NextResponse.json({ data: asset });
-  } catch (error) {
-    console.error('Error retrieving asset details:', error);
+  } catch {
+    console.error('Error retrieving asset details:');
     return NextResponse.json({ error: 'Error retrieving asset details' }, { status: 500 });
   }
 }

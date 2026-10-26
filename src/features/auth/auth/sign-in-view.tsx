@@ -42,9 +42,8 @@ export function SignInView() {
     try {
       await login(formData.email, formData.password);
       router.push('/');
-    } catch (err) {
+    } catch {
       setError('Failed to sign in. Please check your credentials.');
-      console.error(err);
     } finally {
       setLoading(false);
     }

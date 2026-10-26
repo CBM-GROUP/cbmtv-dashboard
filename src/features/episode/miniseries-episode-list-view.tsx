@@ -52,8 +52,8 @@ export function MiniseriesEpisodeListView({
         contentId
       );
       setEpisodes(data);
-    } catch (error) {
-      console.error("Failed to fetch episodes", error);
+    } catch {
+      console.error("Failed to fetch episodes");
     }
   }, [contentId]);
 
@@ -79,8 +79,8 @@ export function MiniseriesEpisodeListView({
     try {
       await miniseriesEpisodeService.deleteMiniseriesEpisode(id);
       fetchEpisodes();
-    } catch (error) {
-      console.error("Failed to delete episode", error);
+    } catch {
+      console.error("Failed to delete episode");
     }
   };
 

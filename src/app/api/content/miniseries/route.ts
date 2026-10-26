@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
   try {
     const response = await apiClient.get(`/api/content/miniseries/?content=${contentId}`);
     return NextResponse.json(response.data);
-  } catch (error) {
-    console.error('Failed to fetch episodes:', error);
+  } catch {
+    console.error('Failed to fetch episodes:');
     return NextResponse.json({ error: 'Failed to fetch episodes' }, { status: 500 });
   }
 }
@@ -40,8 +40,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(response.data, { status: 201 });
-  } catch (error) {
-    console.error('Failed to create episode:', error);
+  } catch {
+    console.error('Failed to create episode:');
     return NextResponse.json({ error: 'Failed to create episode' }, { status: 500 });
   }
 }

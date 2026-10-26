@@ -1,7 +1,7 @@
 import type { ChangeEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import dayjs from "dayjs";
-import duration from "dayjs/plugin/duration";
+import { useVideoMetadata } from "@/hooks/use-video-metadata";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,11 +21,9 @@ import { useUploadManager } from "@/components/upload/upload-manager";
 
 import { Content, Channel } from "@/types";
 import {
-  ContentSaveFailure, MEDIA_FIELDS, saveContentWithMedia,
+  ContentSaveFailure, MEDIA_FIELDS, contentPayload, saveContentWithMedia,
   type SelectedMedia, type UploadedMedia,
 } from "../save-content";
-
-dayjs.extend(duration);
 
 const CONTENT_TYPES = [
   { value: "animations", label: "Animations" },
@@ -36,45 +34,6 @@ const CONTENT_TYPES = [
   { value: "miniseries", label: "Miniseries" },
   { value: "original", label: "Original" },
 ];
-
-const STATUSES = [
-  { value: "preview", label: "Preview" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-  { value: "comingsoon", label: "Comingsoon" },
-];
-
-/**
- * The API stores duration as a Django DurationField, which DRF serialises as
- * "[DD ]HH:MM:SS[.ffffff]" but accepts as either that or a bare second count.
- * The form edits it as a plain number of seconds, so incoming values have to be
- * normalised — `parseInt("00:01:30")` silently yields 0.
- */
-function durationToSeconds(value: string | number | null | undefined): number {
-  if (value === null || value === undefined || value === "") return 0;
-  if (typeof value === "number") return Number.isFinite(value) ? Math.floor(value) : 0;
-
-  const trimmed = value.trim();
-  if (!trimmed) return 0;
-  if (/^\d+$/.test(trimmed)) return Number(trimmed);
-
-  const [dayPart, clockPart] = trimmed.includes(" ")
-    ? [trimmed.slice(0, trimmed.indexOf(" ")), trimmed.slice(trimmed.indexOf(" ") + 1)]
-    : ["0", trimmed];
-
-  const parts = clockPart.split(":").map(Number);
-  if (parts.some((part) => !Number.isFinite(part))) return 0;
-  while (parts.length < 3) parts.unshift(0);
-
-  const [hours, minutes, seconds] = parts;
-  const days = Number(dayPart);
-  return (
-    (Number.isFinite(days) ? days : 0) * 86400 +
-    hours * 3600 +
-    minutes * 60 +
-    Math.floor(seconds)
-  );
-}
 
 interface ContentFormProps {
   open: boolean;
@@ -109,17 +68,21 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
   // A successful upload may precede a later upload or DB failure. Reuse its
   // URL on Save retry instead of creating another orphaned S3 object.
   const uploadedMedia = useRef<UploadedMedia>({});
-  const { enqueue } = useUploadManager();
+  const creationKey = useRef('');
+  const { enqueue, confirmAttachment } = useUploadManager();
+  const metadata = useVideoMetadata(open ? selectedMedia.streaming_link : null);
+  const [confirmationFailed, setConfirmationFailed] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setFormError("");
+    setConfirmationFailed(false);
     setSelectedMedia({ trailer_link: null, streaming_link: null, thumbnail: null });
     uploadedMedia.current = {};
+    creationKey.current = crypto.randomUUID();
     if (editItem) {
       setFormData({
         ...editItem,
-        duration: editItem.duration ? String(durationToSeconds(editItem.duration)) : "",
       });
     } else {
       setFormData({
@@ -148,7 +111,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     });
   };
 
-  const handleSelectChange = (name: "content_type" | "channel" | "status", value: string | null) => {
+  const handleSelectChange = (name: "content_type" | "channel", value: string | null) => {
     if (value === null) return;
     if (name === "channel") {
       setFormError("");
@@ -156,22 +119,8 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     setFormData({ ...formData, [name]: value });
   };
 
-  function buildPayload() {
-    const trimmedDuration = (formData.duration ?? "").trim();
-    const trimmedSize = (formData.size ?? "").trim();
-
-    return {
-      ...formData,
-      channel: Number(formData.channel),
-      // Both are nullable on the model; send null rather than coercing a
-      // blank field to "0", which previously overwrote real values.
-      size: trimmedSize === "" ? null : trimmedSize,
-      duration: trimmedDuration === "" ? null : String(durationToSeconds(trimmedDuration)),
-    };
-  }
-
   const handleSubmit = async () => {
-    if (saving) return;
+    if (saving || metadata.loading || confirmationFailed) return;
     if (!formData.title.trim()) {
       setFormError("Add a title before saving content.");
       return;
@@ -185,19 +134,29 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     setFormError("");
     try {
       await saveContentWithMedia(
-        buildPayload(), selectedMedia, uploadedMedia.current,
-        (file, type, label) => enqueue(file, type, { label }).done,
+        contentPayload(formData, selectedMedia.streaming_link, metadata.duration), selectedMedia, uploadedMedia.current,
+        async (file, type, label) => {
+          const upload = enqueue(file, type, { label });
+          return { jobId: upload.jobId, url: await upload.done };
+        },
         (payload) => editItem
           ? contentService.updateContent(editItem.id, payload)
-          : contentService.createContent(payload),
+          : contentService.createContent(payload, creationKey.current),
+        (jobId, endpoint, field, saved) => { confirmAttachment(jobId, { endpoint, field }, saved); },
+        editItem?.id,
       );
       onSave();
       onClose();
     } catch (error) {
-      console.error("Failed to save content", error);
+      if (error instanceof ContentSaveFailure && error.stage === 'confirmation') {
+        setConfirmationFailed(true);
+        onSave();
+        setFormError('The record was saved, but its media links could not be confirmed. Close this form and inspect the saved record before continuing.');
+        return;
+      }
       setFormError(error instanceof ContentSaveFailure && error.stage === "upload"
         ? `Media upload failed. ${editItem ? "Existing content was not changed" : "Content was not created"}. Your form and selected files are ready to retry.`
-        : `Content save failed. ${editItem ? "Existing content was not changed" : "Content was not created"}. Your form is ready to retry.`);
+        : 'Content save could not be confirmed. Your form and uploaded files are retained. If the response was interrupted, close this form and inspect the content list before continuing.');
     } finally {
       setSaving(false);
     }
@@ -217,13 +176,18 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || Number(formData.channel) <= 0}>
+          <Button onClick={handleSubmit} disabled={saving || metadata.loading || confirmationFailed || Number(formData.channel) <= 0}>
             {saving ? "Uploading and saving..." : "Save"}
           </Button>
         </>
       }
     >
       {formError && <StatusAlert variant="error">{formError}</StatusAlert>}
+      {!editItem && <p className="text-sm text-muted-foreground">New content is saved as Preview. Approve it from the content table after inspection.</p>}
+      {selectedMedia.streaming_link && <p className="text-sm text-muted-foreground" role="status">
+        {metadata.loading ? 'Reading video details…' : metadata.duration
+          ? 'Video details detected automatically.' : 'Duration could not be read. It will remain unknown; you can choose the video again to retry.'}
+      </p>}
       <FormField label="Title" htmlFor="content-title">
         <Input id="content-title" autoFocus name="title" value={formData.title} onChange={handleChange} />
       </FormField>
@@ -308,39 +272,15 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
         <FormField label="Country" htmlFor="content-country">
           <Input id="content-country" name="country" value={formData.country} onChange={handleChange} />
         </FormField>
-        <FormField label="Status" htmlFor="content-status">
-          <Select
-            items={STATUSES}
-            value={formData.status}
-            onValueChange={(value) => handleSelectChange("status", value)}
-          >
-            <SelectTrigger id="content-status" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUSES.map((status) => (
-                <SelectItem key={status.value} value={status.value}>
-                  {status.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FormField>
-        <FormField label="Size" htmlFor="content-size">
-          <Input id="content-size" name="size" type="number" value={formData.size ?? ""} onChange={handleChange} />
-        </FormField>
       </div>
-      <FormField
-        label="Duration (in seconds)"
-        htmlFor="content-duration"
-        hint={
-          formData.duration && !isNaN(Number(formData.duration))
-            ? dayjs.duration(Number(formData.duration), "seconds").format("HH:mm:ss")
-            : undefined
-        }
-      >
-        <Input id="content-duration" name="duration" value={formData.duration ?? ""} onChange={handleChange} />
-      </FormField>
+      <div className="flex flex-wrap gap-6">
+        {(['is_featured', 'is_trending'] as const).map((flag) => <label key={flag} className="flex items-center gap-2 text-sm">
+          <Checkbox checked={formData[flag] ?? false} disabled={saving}
+            onCheckedChange={(checked) => setFormData((previous) => ({ ...previous, [flag]: checked === true }))} />
+          {flag === 'is_featured' ? 'Featured' : 'Trending'}
+        </label>)}
+      </div>
+      <p className="text-xs text-muted-foreground">Featured and Trending are editorial selections. They do not publish Preview content.</p>
     </FormDialog>
   );
 }

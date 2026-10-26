@@ -60,8 +60,6 @@ apiClient.interceptors.response.use(
           },
         );
 
-        console.log('Refresh token response:', response);
-
         const accessToken = response.data.access;
 
         localStorage.setItem('access_token', accessToken);
@@ -73,9 +71,7 @@ apiClient.interceptors.response.use(
         if (refreshError instanceof AuthError) {
           console.error('Authentication error:', refreshError.message);
         } else if (axios.isAxiosError(refreshError) && refreshError.response) {
-          console.error('Error response data:', refreshError.response.data);
           console.error('Error response status:', refreshError.response.status);
-          console.error('Error response headers:', refreshError.response.headers);
         }
 
         localStorage.removeItem('access_token');

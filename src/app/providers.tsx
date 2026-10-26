@@ -4,6 +4,7 @@ import { AuthProvider } from "@/features/auth/context";
 import { ThemeProvider } from "@/theme/theme-provider";
 import { UploadProvider } from "@/components/upload/upload-manager";
 import { UploadTray } from "@/components/upload/upload-tray";
+import { PendingCreations } from "@/components/upload/pending-creations";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <UploadProvider>
           {children}
           <UploadTray />
+          <PendingCreations />
         </UploadProvider>
       </ThemeProvider>
     </AuthProvider>

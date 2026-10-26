@@ -1,4 +1,5 @@
 import apiClient from "./api";
+import { createRecord } from './createRecord';
 import { Episode } from "@/types";
 
 export const miniseriesEpisodeService = {
@@ -7,13 +8,12 @@ export const miniseriesEpisodeService = {
     return response.data;
   },
 
-  async createMiniseriesEpisode(data: Omit<Episode, 'id'> & { content: number }) {
-    const response = await apiClient.post("/api/content/miniseries/", data);
-    return response.data;
+  async createMiniseriesEpisode(data: Omit<Episode, 'id' | 'duration'> & { content: number; duration?: string | null }, operationKey: string) {
+    return createRecord<Episode>('/api/content/miniseries/', data, operationKey);
   },
 
-  async updateMiniseriesEpisode(id: string, data: Partial<Omit<Episode, 'id'> & { content: number }>) {
-    const response = await apiClient.patch(`/api/content/miniseries/${id}/`, data);
+  async updateMiniseriesEpisode(id: string, data: Partial<Omit<Episode, 'id' | 'duration'> & { content: number; duration: string | null }>) {
+    const response = await apiClient.patch<Episode>(`/api/content/miniseries/${id}/`, data);
     return response.data;
   },
 

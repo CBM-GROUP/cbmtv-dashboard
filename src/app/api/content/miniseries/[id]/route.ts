@@ -32,8 +32,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const response = await apiClient.patch(`/api/content/miniseries/${id}/`, data);
     return NextResponse.json(response.data);
 
-  } catch (error) {
-    console.error('Failed to update episode:', error);
+  } catch {
+    console.error('Failed to update episode:');
     return NextResponse.json({ error: 'Failed to update episode' }, { status: 500 });
   }
 }
@@ -47,8 +47,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     await apiClient.delete(`/api/content/miniseries/${id}/`);
     return new Response(null, { status: 204 });
 
-  } catch (error) {
-    console.error('Failed to delete episode:', error);
+  } catch {
+    console.error('Failed to delete episode:');
     return NextResponse.json({ error: 'Failed to delete episode' }, { status: 500 });
   }
 }

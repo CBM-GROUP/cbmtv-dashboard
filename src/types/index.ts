@@ -13,17 +13,21 @@ export interface Content {
   genre: string;
   country: string;
   status: string;
-  size: string;
-  duration: string;
+  size: string | null;
+  duration: string | null;
+  is_featured?: boolean;
+  is_trending?: boolean;
 }
 
 /**
  * What the API accepts on write. `size` and `duration` are nullable on the
- * model, and a blank form field must clear them rather than store "0".
+ * model. New video sizes are exact decimal bytes; duration is decimal seconds.
+ * Omitted asset metadata preserves existing values on PATCH.
  */
-export type ContentPayload = Omit<Content, "id" | "size" | "duration"> & {
-  size: string | null;
-  duration: string | null;
+export type ContentPayload = Omit<Content, "id" | "status" | "size" | "duration"> & {
+  status?: string;
+  size?: string | null;
+  duration?: string | null;
 };
 
 export interface Channel {

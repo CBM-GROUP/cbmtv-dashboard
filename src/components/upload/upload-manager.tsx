@@ -6,6 +6,7 @@ import axios from "axios";
 
 import apiClient from "@/services/api";
 import { uploadMultipartVideo } from "./multipart-video";
+import { attachedJob, attachmentMatches, reusableUpload, type CompletedUpload } from "./attachment";
 
 export type MediaType = "video" | "image";
 
@@ -22,7 +23,7 @@ export type UploadStatus =
  *
  * Omit it only when the record does not exist yet. Without a target the URL is
  * held in the tray and is lost on reload, which is how uploads used to be
- * orphaned in S3 -- prefer saving the record first and passing a target.
+ * orphaned in S3. Upload-first forms confirm attachment after their final save.
  */
 export interface AttachTarget {
   /** API path of the record, e.g. "/api/content/12/". */
@@ -42,6 +43,8 @@ export interface UploadJob {
   progress: number;
   error: string;
   deliveryUrl: string;
+  /** Set only after storage accepted all bytes, never inferred from progress. */
+  transferComplete?: boolean;
   attach?: AttachTarget;
 }
 
@@ -63,6 +66,7 @@ interface UploadManagerValue {
   retryUpload: (jobId: string) => void;
   dismissJob: (jobId: string) => void;
   dismissFinished: () => void;
+  confirmAttachment: (jobId: string, target: AttachTarget, saved: unknown) => boolean;
   /** Notified after a job writes its URL onto a record, so lists can refetch. */
   subscribeToAttached: (listener: (job: UploadJob) => void) => () => void;
 }
@@ -91,13 +95,22 @@ export function isActive(job: UploadJob) {
 }
 
 export function UploadProvider({ children }: { children: ReactNode }) {
-  const [jobs, setJobs] = useState<UploadJob[]>([]);
+  const [jobs, setJobsState] = useState<UploadJob[]>([]);
+  const jobsRef = useRef<UploadJob[]>([]);
+  // Promise chains can finish before React commits a render. Keep job state
+  // current synchronously so save confirmation never sees a stale closure.
+  const setJobs = useCallback((update: (previous: UploadJob[]) => UploadJob[]) => {
+    jobsRef.current = update(jobsRef.current);
+    setJobsState(jobsRef.current);
+  }, []);
 
   // Kept out of state: mutating these must not re-render, and the File handles
   // are what make retry possible after a presigned URL expires.
   const controllers = useRef(new Map<string, AbortController>());
   const files = useRef(new Map<string, File>());
   const uploadedUrls = useRef(new Map<string, string>());
+  const successfulFiles = useRef(new WeakMap<File, CompletedUpload>());
+  const activeFiles = useRef(new WeakMap<File, EnqueuedUpload>());
   const listeners = useRef(new Set<(job: UploadJob) => void>());
   const nextId = useRef(0);
 
@@ -105,7 +118,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setJobs((previous) =>
       previous.map((job) => (job.id === jobId ? { ...job, ...changes } : job)),
     );
-  }, []);
+  }, [setJobs]);
 
   const subscribeToAttached = useCallback((listener: (job: UploadJob) => void) => {
     listeners.current.add(listener);
@@ -113,6 +126,23 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       listeners.current.delete(listener);
     };
   }, []);
+
+  const confirmAttachment = useCallback((jobId: string, target: AttachTarget, saved: unknown) => {
+    const job = jobsRef.current.find((candidate) => candidate.id === jobId);
+    const attached = attachedJob(job, target, saved);
+    if (!attached || !job) return false;
+    if (job.status === 'success' && job.attach?.endpoint === target.endpoint && job.attach.field === target.field) return true;
+    const file = files.current.get(jobId);
+    if (file) successfulFiles.current.set(file, { jobId, url: job.deliveryUrl, mediaType: job.mediaType });
+    controllers.current.delete(jobId);
+    files.current.delete(jobId);
+    uploadedUrls.current.delete(jobId);
+    patchJob(jobId, { attach: target, status: 'success', error: '' });
+    listeners.current.forEach((listener) => {
+      try { listener(attached); } catch { console.error('Upload attachment listener failed.'); }
+    });
+    return true;
+  }, [patchJob]);
 
   /**
    * Drives one job to completion. Split out from `enqueue` so `retryUpload` can
@@ -170,12 +200,16 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      patchJob(jobId, { progress: 100, deliveryUrl });
+      if (controller.signal.aborted) throw new DOMException('Upload canceled', 'AbortError');
+      patchJob(jobId, { progress: 100, deliveryUrl, transferComplete: true });
 
       if (attach) {
         patchJob(jobId, { status: "attaching" });
         try {
-          await apiClient.patch(attach.endpoint, { [attach.field]: deliveryUrl }, { signal: controller.signal });
+          const saved = await apiClient.patch(attach.endpoint, { [attach.field]: deliveryUrl }, { signal: controller.signal });
+          if (!attachmentMatches(deliveryUrl, attach.endpoint, attach.field, saved.data)) {
+            throw new Error('The saved record did not confirm this media link.');
+          }
         } catch (error) {
           // The file is in S3 and the URL is retained for an attachment-only retry.
           failed("Uploaded, but saving the link to the record failed. Retry or copy the URL.");
@@ -183,7 +217,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      if (controller.signal.aborted) throw new DOMException('Upload canceled', 'AbortError');
       patchJob(jobId, { status: "success" });
+      successfulFiles.current.set(file, { jobId, url: deliveryUrl, mediaType });
       controllers.current.delete(jobId);
       files.current.delete(jobId);
       uploadedUrls.current.delete(jobId);
@@ -200,7 +236,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           deliveryUrl,
           attach,
         };
-        listeners.current.forEach((listener) => listener(finished));
+        listeners.current.forEach((listener) => {
+          try { listener(finished); } catch { console.error('Upload attachment listener failed.'); }
+        });
       }
 
       return deliveryUrl;
@@ -210,6 +248,18 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const enqueue = useCallback(
     (file: File, mediaType: MediaType, options?: StartUploadOptions): EnqueuedUpload => {
+      const active = activeFiles.current.get(file);
+      const activeJob = active && jobsRef.current.find(job => job.id === active.jobId);
+      if (active && activeJob && isActive(activeJob) && activeJob.mediaType === mediaType &&
+        activeJob.attach?.endpoint === options?.attach?.endpoint && activeJob.attach?.field === options?.attach?.field) return active;
+      // A tray retry can finish after the original form promise rejected.
+      // Reuse those bytes when that same selected File is saved again.
+      const completed = successfulFiles.current.get(file);
+      const completedJob = completed && jobsRef.current.find((job) => job.id === completed.jobId);
+      const reusable = reusableUpload(completed, completedJob, mediaType);
+      if (!options?.attach && reusable) {
+        return { jobId: reusable.jobId, done: Promise.resolve(reusable.url) };
+      }
       nextId.current += 1;
       const jobId = `upload-${nextId.current}`;
 
@@ -230,9 +280,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         },
       ]);
 
-      return { jobId, done: run(jobId, file, mediaType, options?.attach) };
+      const result = { jobId, done: run(jobId, file, mediaType, options?.attach) };
+      activeFiles.current.set(file, result);
+      const release = () => { if (activeFiles.current.get(file)?.jobId === jobId) activeFiles.current.delete(file); };
+      void result.done.then(release, release);
+      return result;
     },
-    [run],
+    [run, setJobs],
   );
 
   const cancelUpload = useCallback(
@@ -248,12 +302,15 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     (jobId: string) => {
       const file = files.current.get(jobId);
       if (!file) return;
-      const job = jobs.find((candidate) => candidate.id === jobId);
-      if (!job) return;
+      const job = jobsRef.current.find((candidate) => candidate.id === jobId);
+      if (!job || isActive(job)) return;
       // Nothing awaits a retry, so swallow the rejection the job already records.
-      run(jobId, file, job.mediaType, job.attach).catch(() => undefined);
+      const done = run(jobId, file, job.mediaType, job.attach);
+      activeFiles.current.set(file, { jobId, done });
+      const release = () => { if (activeFiles.current.get(file)?.jobId === jobId) activeFiles.current.delete(file); };
+      void done.then(release, release);
     },
-    [jobs, run],
+    [run],
   );
 
   const dismissJob = useCallback((jobId: string) => {
@@ -262,7 +319,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     files.current.delete(jobId);
     uploadedUrls.current.delete(jobId);
     setJobs((previous) => previous.filter((job) => job.id !== jobId));
-  }, []);
+  }, [setJobs]);
 
   const dismissFinished = useCallback(() => {
     setJobs((previous) => {
@@ -270,7 +327,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       previous.filter((job) => !isActive(job)).forEach((job) => uploadedUrls.current.delete(job.id));
       return previous.filter(isActive);
     });
-  }, []);
+  }, [setJobs]);
 
   const value = useMemo(
     () => ({
@@ -280,9 +337,10 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       retryUpload,
       dismissJob,
       dismissFinished,
+      confirmAttachment,
       subscribeToAttached,
     }),
-    [jobs, enqueue, cancelUpload, retryUpload, dismissJob, dismissFinished, subscribeToAttached],
+    [jobs, enqueue, cancelUpload, retryUpload, dismissJob, dismissFinished, confirmAttachment, subscribeToAttached],
   );
 
   return <UploadManagerContext.Provider value={value}>{children}</UploadManagerContext.Provider>;

@@ -79,12 +79,11 @@ export function ProfileView() {
 
     if (Object.keys(changedFields).length > 0) {
       try {
-        console.log(changedFields);
         await apiClient.patch(`/api/accounts/users/${user?.id}/`, changedFields);
         fetchUser();
         setIsEditing(false);
-      } catch (error) {
-        console.error('Failed to update user details', error);
+      } catch {
+        console.error('Failed to update user details');
       }
     } else {
       setIsEditing(false);

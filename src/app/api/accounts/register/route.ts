@@ -24,8 +24,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(response.data, { status: 201 });
-  } catch (error) {
-    console.error('Registration error:', error);
+  } catch {
+    console.error('Registration backend request failed.');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

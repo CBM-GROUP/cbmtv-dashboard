@@ -34,8 +34,8 @@ export function useMuxUpload() {
         const playbackUrl = `https://stream.mux.com/${playbackId}.m3u8`;
         setFinalUrl(playbackUrl);
       }
-    } catch (error) {
-      console.error("Failed to get asset details:", error);
+    } catch {
+      console.error("Failed to get asset details:");
     }
   };
 

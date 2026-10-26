@@ -39,6 +39,7 @@ import { DataTablePagination } from "@/components/data-table-pagination";
 import { PageHeader, PageShell, PageToolbar } from "@/components/page-shell";
 
 import { ContentForm } from "./content-form";
+import { changePublication } from "../publication";
 
 import { channelService } from "src/services/channelService";
 import { contentService } from "src/services/contentService";
@@ -128,6 +129,9 @@ export function ContentListView() {
   const [editItem, setEditItem] = useState<Content | null>(null);
   const [playingContent, setPlayingContent] = useState<Content | null>(null);
   const [playbackError, setPlaybackError] = useState("");
+  const pendingPublication = useRef(new Set<string>());
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [publicationMessage, setPublicationMessage] = useState<{ error: boolean; text: string } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const { subscribeToAttached } = useUploadManager();
 
@@ -145,8 +149,8 @@ export function ContentListView() {
     try {
       const data = await contentService.getContent();
       setContent(data);
-    } catch (error) {
-      console.error("Failed to fetch content", error);
+    } catch {
+      console.error("Failed to fetch content");
     }
   };
 
@@ -154,8 +158,8 @@ export function ContentListView() {
     try {
       const data = await channelService.getChannels();
       setChannels(data);
-    } catch (error) {
-      console.error("Failed to fetch channels", error);
+    } catch {
+      console.error("Failed to fetch channels");
     }
   };
 
@@ -194,13 +198,31 @@ export function ContentListView() {
     try {
       await contentService.deleteContent(id);
       fetchContent();
-    } catch (error) {
-      console.error("Failed to delete content", error);
+    } catch {
+      console.error("Failed to delete content");
     }
   };
 
   const handleSave = () => {
     fetchContent();
+  };
+
+  const handlePublication = async (item: Content) => {
+    const id = String(item.id);
+    if (pendingPublication.current.has(id)) return;
+    pendingPublication.current.add(id);
+    setPendingIds([...pendingPublication.current]);
+    setPublicationMessage(null);
+    try {
+      const saved = await changePublication(item, contentService.updateContent);
+      setContent((previous) => previous.map((row) => String(row.id) === id ? saved : row));
+      setPublicationMessage({ error: false, text: `${saved.title} ${saved.status === 'approved' ? 'approved' : 'returned to Preview'}.` });
+    } catch {
+      setPublicationMessage({ error: true, text: 'The publication change could not be confirmed. Refresh the list and try again.' });
+    } finally {
+      pendingPublication.current.delete(id);
+      setPendingIds([...pendingPublication.current]);
+    }
   };
 
   const handleClosePlayer = () => {
@@ -249,6 +271,9 @@ export function ContentListView() {
           </Button>
         }
       />
+      {publicationMessage && <div role="status" aria-live="polite">
+        <StatusAlert variant={publicationMessage.error ? 'error' : 'info'}>{publicationMessage.text}</StatusAlert>
+      </div>}
       <PageToolbar>
         <Select
           items={channelItems}
@@ -336,6 +361,7 @@ export function ContentListView() {
                       ?.name || "—"}
                   </TableCell>
                   <TableCell>
+                    <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant={
                         item.status === "rejected"
@@ -347,6 +373,14 @@ export function ContentListView() {
                     >
                       {item.status || "Unspecified"}
                     </Badge>
+                    {(item.status === 'preview' || item.status === 'approved') && <Button
+                      variant="outline" size="sm" disabled={pendingIds.includes(String(item.id))}
+                      onClick={() => void handlePublication(item)}
+                      aria-label={`${item.status === 'preview' ? 'Approve' : 'Unpublish'} ${item.title}`}
+                    >
+                      {pendingIds.includes(String(item.id)) ? 'Saving…' : item.status === 'preview' ? 'Approve' : 'Unpublish'}
+                    </Button>}
+                    </div>
                   </TableCell>
                   <TableCell className="pr-4">
                     <div className="flex flex-wrap justify-end gap-1">

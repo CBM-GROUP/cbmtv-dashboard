@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Image from 'next/image';
 import { ImageUpIcon } from 'lucide-react';
 
@@ -8,18 +8,39 @@ import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/form-field';
 import { useMediaUpload } from '@/hooks/use-media-upload';
 
+export type ConfirmImage = (saved: unknown, endpoint: string, field: string) => boolean;
+
 interface ImageUploaderProps {
-  onUpload: (url: string) => void;
+  onUpload: (url: string, confirm?: ConfirmImage) => void;
+  disabled?: boolean;
+  onPendingChange?: (pending: boolean) => void;
   /** Null until an editor uploads one; the API returns null for unset media. */
   value: string | null | undefined;
   label: string;
 }
 
-export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
+export function ImageUploader({ onUpload, value, label, disabled, onPendingChange }: ImageUploaderProps) {
   const id = useId();
   const uploader = useMediaUpload('image');
   const [previewFailed, setPreviewFailed] = useState(false);
+  const mounted = useRef(true);
+  const selection = useRef(0);
+  const lastNotifiedUrl = useRef<string | null>(null);
+  const callbacks = useRef({ onUpload, onPendingChange });
+  callbacks.current = { onUpload, onPendingChange };
+  const resetUpload = uploader.reset;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; selection.current += 1; resetUpload(); }; }, [resetUpload]);
   const uploading = uploader.status === 'uploading';
+
+  useEffect(() => { callbacks.current.onPendingChange?.(uploading); }, [uploading]);
+  useEffect(() => {
+    // Tray retries have a new promise, so the original selection handler will
+    // not receive their result. Reconcile it into the still-open form once.
+    if (uploader.status === 'success' && uploader.finalUrl && lastNotifiedUrl.current !== uploader.finalUrl) {
+      lastNotifiedUrl.current = uploader.finalUrl;
+      callbacks.current.onUpload(uploader.finalUrl, uploader.confirmSaved);
+    }
+  }, [uploader.status, uploader.finalUrl, uploader.confirmSaved]);
 
   useEffect(() => {
     setPreviewFailed(false);
@@ -41,10 +62,18 @@ export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
       return;
     }
     const file = e.target.files[0];
+    const currentSelection = ++selection.current;
+    onPendingChange?.(true);
     try {
-      onUpload(await uploader.uploadFile(file));
-    } catch (error) {
-      console.error('Failed to upload image', error);
+      const { url, confirm } = await uploader.uploadWithProof(file);
+      if (mounted.current && selection.current === currentSelection) {
+        lastNotifiedUrl.current = url;
+        callbacks.current.onUpload(url, confirm);
+      }
+    } catch {
+      // The upload manager owns the recoverable error and delivery URL.
+    } finally {
+      if (mounted.current && selection.current === currentSelection) callbacks.current.onPendingChange?.(false);
     }
   };
 
@@ -64,6 +93,7 @@ export function ImageUploader({ onUpload, value, label }: ImageUploaderProps) {
         >
           <input
             type="file"
+            disabled={uploading || disabled}
             onChange={handleImageUpload}
             accept="image/*"
             aria-label={`Upload ${label}`}

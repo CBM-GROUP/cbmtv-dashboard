@@ -27,13 +27,14 @@ export async function POST(request: Request) {
 
     const responseBody = await response.text();
     const contentType = response.headers.get('content-type');
+    const retryAfter = response.headers.get('retry-after');
 
     return new NextResponse(responseBody, {
       status: response.status,
-      headers: contentType ? { 'Content-Type': contentType } : undefined,
+      headers: { ...(contentType ? { 'Content-Type': contentType } : {}), ...(retryAfter ? { 'Retry-After': retryAfter } : {}) },
     });
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch {
+    console.error('Login backend request failed.');
     return NextResponse.json({ error: 'Unable to reach backend API' }, { status: 502 });
   }
 }

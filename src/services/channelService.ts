@@ -1,4 +1,5 @@
 import apiClient from "./api";
+import { createRecord } from './createRecord';
 import { Channel } from "@/types";
 import { fetchAllPages } from "./fetchAllPages";
 
@@ -7,9 +8,8 @@ export const channelService = {
     return fetchAllPages<Channel>(apiClient, "/api/channels/");
   },
 
-  async createChannel(data: Omit<Channel, 'id'>) {
-    const response = await apiClient.post("/api/channels/", data);
-    return response.data;
+  async createChannel(data: Omit<Channel, 'id'>, operationKey: string) {
+    return createRecord<Channel>('/api/channels/', data, operationKey);
   },
 
   async updateChannel(id: string, data: Partial<Omit<Channel, 'id'>>) {

@@ -36,8 +36,8 @@ export function AdvertListView() {
     try {
       const data = await advertService.getAdverts();
       setAdverts(data);
-    } catch (error) {
-      console.error('Failed to fetch adverts', error);
+    } catch {
+      console.error('Failed to fetch adverts');
     }
   };
 
@@ -68,8 +68,8 @@ export function AdvertListView() {
     try {
       await advertService.deleteAdvert(id);
       fetchAdverts();
-    } catch (error) {
-      console.error('Failed to delete advert', error);
+    } catch {
+      console.error('Failed to delete advert');
     }
   };
 
