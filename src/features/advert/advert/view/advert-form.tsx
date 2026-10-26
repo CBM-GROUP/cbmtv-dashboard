@@ -1,11 +1,11 @@
 import type { ChangeEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { advertService } from "src/services/advertService";
 
 import { useMediaUpload } from "@/hooks/use-media-upload";
 import { VideoUploader } from "@/components/video-uploader";
-import { ImageUploader } from "@/components/image-uploader";
+import { ImageUploader, type ConfirmImage } from "@/components/image-uploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +37,11 @@ interface AdvertFormProps {
 
 export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertFormProps) {
   const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const imageConfirmation = useRef<ConfirmImage | undefined>(undefined);
+  const savedId = useRef<string | null>(null);
+  const creationKey = useRef('');
   const [formData, setFormData] = useState({
     advert_type: "middle",
     advert_name: "",
@@ -56,8 +61,15 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
       ? { endpoint: `/api/content/adverts/${editItem.id}/`, field: "stream_link" }
       : undefined,
   });
+  const resetUpload = uploader.reset;
 
   useEffect(() => {
+    if (!open) return;
+    creationKey.current = crypto.randomUUID();
+    resetUpload();
+    savedId.current = null;
+    imageConfirmation.current = undefined;
+    setImageUploading(false);
     setSaveError("");
     if (editItem) {
       setFormData({
@@ -82,7 +94,7 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
         hero_order: 0,
       });
     }
-  }, [editItem]);
+  }, [editItem, open, resetUpload]);
 
   useEffect(() => {
     if (uploader.finalUrl) {
@@ -99,38 +111,47 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
   };
 
   const handleSubmit = async () => {
+    if (saving || imageUploading || uploader.status === 'uploading') return;
+    setSaving(true);
     setSaveError("");
     try {
       let saved: Advert;
-      if (editItem) {
-        saved = await advertService.updateAdvert(editItem.id, formData);
+      const id = editItem?.id ?? savedId.current;
+      if (id) {
+        saved = await advertService.updateAdvert(id, formData);
       } else {
-        saved = await advertService.createAdvert(formData);
+        saved = await advertService.createAdvert(formData, creationKey.current);
       }
+      if (!/^[1-9]\d*$/.test(String(saved?.id)) || (id && String(saved.id) !== String(id))) throw new Error('Advert save was not confirmed.');
+      savedId.current = saved.id;
+      const endpoint = `/api/content/adverts/${saved.id}/`;
+      if (uploader.finalUrl && !uploader.confirmSaved(saved, endpoint, 'stream_link')) throw new Error('Video attachment was not confirmed.');
+      if (imageConfirmation.current && !imageConfirmation.current(saved, endpoint, 'advert_thumbnail')) throw new Error('Image attachment was not confirmed.');
       onSave();
       if (saved.show_in_hero === undefined || saved.hero_order === undefined) {
         setSaveError("The advert was saved, but this backend cannot store homepage hero settings yet.");
         return;
       }
       onClose();
-    } catch (error) {
-      console.error("Failed to save advert", error);
-      setSaveError("Could not save advert. Please try again.");
+    } catch {
+      setSaveError('Advert save or attachment could not be confirmed. Uploaded files are retained. Inspect the advert list first if a creation response was interrupted.');
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <FormDialog
       open={open}
-      onClose={onClose}
+      onClose={() => { if (!saving) onClose(); }}
       title={editItem ? "Edit Advert" : "Create Advert"}
       footer={
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={uploader.status === "uploading"}>
-            Save
+          <Button onClick={handleSubmit} disabled={saving || imageUploading || uploader.status === "uploading"}>
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </>
       }
@@ -201,6 +222,7 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
       </FormField>
 
       <VideoUploader
+        disabled={saving}
         label="Advert Video"
         status={uploader.status}
         progress={uploader.progress}
@@ -211,9 +233,12 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
       <p className="text-sm text-muted-foreground">Leave the video empty for an image slide. A thumbnail also serves as the poster for a video slide.</p>
 
       <ImageUploader
+        key={`${open}:${editItem?.id ?? 'new'}`}
+        disabled={saving}
+        onPendingChange={setImageUploading}
         label="Advert Thumbnail URL"
         value={formData.advert_thumbnail}
-        onUpload={(url) => setFormData({ ...formData, advert_thumbnail: url })}
+        onUpload={(url, confirm) => { imageConfirmation.current = confirm; setFormData((previous) => ({ ...previous, advert_thumbnail: url })); }}
       />
     </FormDialog>
   );

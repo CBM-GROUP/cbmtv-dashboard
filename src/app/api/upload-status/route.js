@@ -17,8 +17,8 @@ export async function GET(request) {
   try {
     const upload = await video.uploads.retrieve(uploadId);
     return NextResponse.json({ data: upload });
-  } catch (error) {
-    console.error('Error retrieving upload status:', error);
+  } catch {
+    console.error('Error retrieving upload status:');
     return NextResponse.json({ error: 'Error retrieving upload status' }, { status: 500 });
   }
 }

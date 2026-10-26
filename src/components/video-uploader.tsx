@@ -9,6 +9,7 @@ import { FormField } from "@/components/form-field";
 import { cn } from "@/lib/utils";
 
 interface VideoUploaderProps {
+  disabled?: boolean;
   label: string;
   status: string;
   progress: number;
@@ -18,7 +19,7 @@ interface VideoUploaderProps {
   onUpload: (file: File) => Promise<string>;
 }
 
-export function VideoUploader({ label, status, progress, error, finalUrl, onUpload }: VideoUploaderProps) {
+export function VideoUploader({ label, status, progress, error, finalUrl, onUpload, disabled }: VideoUploaderProps) {
   const id = useId();
   const uploading = status === "uploading";
 
@@ -32,11 +33,11 @@ export function VideoUploader({ label, status, progress, error, finalUrl, onUplo
     <FormField label={label} htmlFor={id} error={status === "error" ? error : undefined}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <label
-          aria-disabled={uploading}
+          aria-disabled={uploading || disabled}
           className={cn(
             buttonVariants({ variant: "outline" }),
             "cursor-pointer focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50",
-            uploading && "pointer-events-none opacity-50",
+            (uploading || disabled) && "pointer-events-none opacity-50",
           )}
         >
           {uploading ? <LoaderCircleIcon className="animate-spin" /> : <FileVideoIcon />}
@@ -44,7 +45,7 @@ export function VideoUploader({ label, status, progress, error, finalUrl, onUplo
           <input
             className="sr-only"
             type="file"
-            disabled={uploading}
+            disabled={uploading || disabled}
             accept="video/mp4,video/x-m4v,video/quicktime,video/webm"
             onChange={handleChange}
           />

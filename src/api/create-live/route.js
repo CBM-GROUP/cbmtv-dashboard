@@ -13,14 +13,14 @@ export async function POST() {
     });
 
     // ✅ Log the full Mux response to your server console
-    console.log("✅ Mux Live Stream Created:", JSON.stringify(liveStream, null, 2));
+    console.log("Live stream created.");
 
     return new Response(JSON.stringify(liveStream), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("❌ Mux API Error:", error);
+    console.error("❌ Mux API Error:");
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

@@ -17,8 +17,8 @@ export async function POST() {
     });
 
     return NextResponse.json({ data: upload });
-  } catch (error) {
-    console.error('Error creating Mux upload URL:', error);
+  } catch {
+    console.error('Error creating Mux upload URL:');
     return NextResponse.json({ error: 'Error creating upload URL' }, { status: 500 });
   }
 }

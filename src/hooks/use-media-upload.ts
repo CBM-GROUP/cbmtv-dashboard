@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 
 import type { AttachTarget, MediaType } from "@/components/upload/upload-manager";
 import { useUploadManager } from "@/components/upload/upload-manager";
+import { uploadConfirmation } from '@/components/upload/attachment';
 
 interface UseMediaUploadOptions {
   /**
@@ -30,8 +31,9 @@ interface UseMediaUploadOptions {
  * unmount is only this local mirror of the job's state.
  */
 export function useMediaUpload(mediaType: MediaType, options?: UseMediaUploadOptions) {
-  const { jobs, enqueue } = useUploadManager();
+  const { jobs, enqueue, confirmAttachment } = useUploadManager();
   const [jobId, setJobId] = useState<string | null>(null);
+  const generation = useRef(0);
 
   const job = jobs.find((candidate) => candidate.id === jobId);
 
@@ -44,9 +46,15 @@ export function useMediaUpload(mediaType: MediaType, options?: UseMediaUploadOpt
   // Failures that happen before a job exists (e.g. the record could not be
   // saved), which therefore have nowhere else to be reported.
   const [preflightError, setPreflightError] = useState("");
+  const reset = useCallback(() => {
+    generation.current += 1;
+    setJobId(null);
+    setPreflightError('');
+  }, []);
 
-  const uploadFile = useCallback(
+  const uploadWithProof = useCallback(
     async (file: File) => {
+      const selection = ++generation.current;
       const current = optionsRef.current;
       setPreflightError("");
 
@@ -63,15 +71,19 @@ export function useMediaUpload(mediaType: MediaType, options?: UseMediaUploadOpt
         }
       }
 
+      if (selection !== generation.current) throw new Error('The upload selection is no longer current.');
       const { jobId: id, done } = enqueue(file, mediaType, {
         attach,
         label: current?.label ? `${current.label} — ${file.name}` : file.name,
       });
       setJobId(id);
-      return done;
+      const url = await done;
+      if (selection !== generation.current) throw new Error('The upload selection is no longer current.');
+      return { url, confirm: uploadConfirmation(id, url, confirmAttachment) };
     },
-    [enqueue, mediaType],
+    [enqueue, mediaType, confirmAttachment],
   );
+  const uploadFile = useCallback(async (file: File) => (await uploadWithProof(file)).url, [uploadWithProof]);
 
   let status: "idle" | "uploading" | "success" | "error" = "idle";
   if (preflightError) {
@@ -84,10 +96,13 @@ export function useMediaUpload(mediaType: MediaType, options?: UseMediaUploadOpt
   }
 
   return {
+    reset,
+    confirmSaved: job ? uploadConfirmation(job.id, job.deliveryUrl, confirmAttachment) : () => false,
     status,
     finalUrl: job?.deliveryUrl ?? "",
     error: preflightError || job?.error || "",
     progress: job?.progress ?? 0,
     uploadFile,
+    uploadWithProof,
   };
 }

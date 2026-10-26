@@ -1,4 +1,5 @@
 import apiClient from "./api";
+import { createRecord } from './createRecord';
 import { Content, ContentPayload } from "@/types";
 import { normalizeListResponse } from "./normalizeListResponse";
 
@@ -19,13 +20,13 @@ export const contentService = {
     }
   },
 
-  async createContent(data: ContentPayload) {
-    const response = await apiClient.post("/api/content/", data);
-    return response.data;
+  async createContent(data: ContentPayload, operationKey: string) {
+    return createRecord<Content>('/api/content/', data, operationKey);
   },
 
-  async updateContent(id: string, data: Partial<ContentPayload>) {
-    const response = await apiClient.patch(`/api/content/${id}/`, data);
+  async updateContent(id: string, data: Partial<ContentPayload>, expectedStatus?: string) {
+    const response = await apiClient.patch<Content>(`/api/content/${id}/`, data,
+      expectedStatus === undefined ? undefined : { headers: { 'If-Publication-Status': expectedStatus } });
     return response.data;
   },
 

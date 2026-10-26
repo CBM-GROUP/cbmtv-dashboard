@@ -51,7 +51,7 @@ export function ChannelListView() {
       // Without this the table just renders empty on a failed load, which
       // reads as "no channels yet" and invites duplicate-name create attempts.
       const message = getApiErrorMessage(err, 'Failed to load channels');
-      console.error('Failed to fetch channels', message, err);
+      console.error('Failed to fetch channels');
       setError(message);
     }
   };
@@ -82,7 +82,7 @@ export function ChannelListView() {
       fetchChannels();
     } catch (err) {
       const message = getApiErrorMessage(err, 'Failed to delete channel');
-      console.error('Failed to delete channel', message, err);
+      console.error('Failed to delete channel');
       setError(message);
     }
   };

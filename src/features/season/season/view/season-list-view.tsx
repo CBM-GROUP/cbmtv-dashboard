@@ -48,8 +48,8 @@ export function SeasonListView() {
       setSeasons(await fetchAllPages<Season>(
         apiClient, `/api/content/seasons/?content=${contentId}&scope=dashboard`,
       ));
-    } catch (error) {
-      console.error("Failed to fetch seasons", error);
+    } catch {
+      console.error("Failed to fetch seasons");
     }
   };
 
@@ -92,8 +92,8 @@ export function SeasonListView() {
       }
       fetchSeasons();
       handleClose();
-    } catch (error) {
-      console.error("Failed to save season", error);
+    } catch {
+      console.error("Failed to save season");
     }
   };
 
@@ -101,8 +101,8 @@ export function SeasonListView() {
     try {
       await apiClient.delete(`/api/content/seasons/${id}/`);
       fetchSeasons();
-    } catch (error) {
-      console.error("Failed to delete season", error);
+    } catch {
+      console.error("Failed to delete season");
     }
   };
 

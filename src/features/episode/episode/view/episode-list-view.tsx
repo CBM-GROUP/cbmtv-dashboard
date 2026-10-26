@@ -1,6 +1,6 @@
 import type { ChangeEvent } from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 
@@ -14,14 +14,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FormDialog } from "@/components/form-dialog";
-import { FormField } from "@/components/form-field";
+import { FormField, StatusAlert } from "@/components/form-field";
 import { PageHeader, PageShell } from "@/components/page-shell";
 
 import apiClient from "src/services/api";
+import { createRecord } from '@/services/createRecord';
 import { fetchAllPages } from "src/services/fetchAllPages";
 
-import { useMediaUpload } from "@/hooks/use-media-upload";
-import { VideoUploader } from "@/components/video-uploader";
+import { useSelectedVideo } from "@/hooks/use-selected-video";
 
 interface Episode {
   id: string;
@@ -40,43 +40,17 @@ export function EpisodeListView() {
     episode_number: null as number | null,
     streaming_link: "",
   });
-  const [autoSavedId, setAutoSavedId] = useState<string | null>(null);
-
-  const ensureSaved = async () => {
-    if (editItem?.id || autoSavedId) return editItem?.id || autoSavedId;
-    if (!formData.title.trim() || !Number(formData.episode_number)) {
-      throw new Error("Add an episode title and number before uploading video.");
-    }
-    const { data } = await apiClient.post<Episode>("/api/content/episodes/", {
-      ...formData,
-      season: seasonId,
-    });
-    setAutoSavedId(data.id);
-    void fetchEpisodes();
-    return data.id;
-  };
-
-  // In edit mode the episode exists, so a finished upload can write its own
-  // URL onto the record and the dialog is free to close.
-  const uploader = useMediaUpload("video", {
-    label: editItem ? `Episode - ${editItem.title}` : "Episode video",
-    resolveAttach: async () => ({
-      endpoint: `/api/content/episodes/${await ensureSaved()}/`,
-      field: "streaming_link",
-    }),
-  });
-
-  useEffect(() => {
-    if (uploader.finalUrl) {
-      setFormData((previous) => ({ ...previous, streaming_link: uploader.finalUrl }));
-    }
-  }, [uploader.finalUrl]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const savedId = useRef<string | null>(null);
+  const creationKey = useRef('');
+  const video = useSelectedVideo(open);
 
   const fetchEpisodes = async () => {
     try {
       setEpisodes(await fetchAllPages<Episode>(apiClient, `/api/content/episodes/?season=${seasonId}&scope=dashboard`));
-    } catch (error) {
-      console.error("Failed to fetch episodes", error);
+    } catch {
+      console.error("Failed to fetch episodes");
     }
   };
 
@@ -86,7 +60,10 @@ export function EpisodeListView() {
   }, [seasonId]);
 
   const handleOpen = (item: Episode | null = null) => {
-    setAutoSavedId(null);
+    creationKey.current = crypto.randomUUID();
+    savedId.current = null;
+    setSaveError('');
+    video.select(null);
     setEditItem(item);
     setFormData(
       item
@@ -101,6 +78,7 @@ export function EpisodeListView() {
   };
 
   const handleClose = () => {
+    if (saving) return;
     setOpen(false);
     setEditItem(null);
   };
@@ -110,17 +88,28 @@ export function EpisodeListView() {
   };
 
   const handleSubmit = async () => {
-    const data = { ...formData, season: seasonId };
+    if (saving || video.metadata.loading) return;
+    if (!formData.title.trim() || !Number.isInteger(Number(formData.episode_number)) || Number(formData.episode_number) <= 0) {
+      setSaveError('Add an episode title and positive episode number.');
+      return;
+    }
+    setSaving(true);
+    setSaveError('');
     try {
-      if (editItem || autoSavedId) {
-        await apiClient.patch(`/api/content/episodes/${editItem?.id || autoSavedId}/`, data);
-      } else {
-        await apiClient.post("/api/content/episodes/", data);
-      }
-      fetchEpisodes();
-      handleClose();
-    } catch (error) {
-      console.error("Failed to save episode", error);
+      const data = { ...formData, season: seasonId, ...await video.uploadForSave() };
+      const id = editItem?.id ?? savedId.current;
+      const response = id ? await apiClient.patch<Episode>(`/api/content/episodes/${id}/`, data)
+        : { data: await createRecord<Episode>('/api/content/episodes/', data, creationKey.current) };
+      if (!/^[1-9]\d*$/.test(String(response.data?.id)) || (id && String(response.data.id) !== String(id))) throw new Error('The saved episode could not be confirmed. Inspect the episode list before retrying.');
+      savedId.current = response.data.id;
+      video.confirmSaved(response.data, `/api/content/episodes/${response.data.id}/`);
+      void fetchEpisodes();
+      setOpen(false);
+      setEditItem(null);
+    } catch {
+      setSaveError('Episode save or media confirmation failed. Uploaded files are retained for retry. If the request response was lost, inspect the episode list before retrying creation.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -128,8 +117,8 @@ export function EpisodeListView() {
     try {
       await apiClient.delete(`/api/content/episodes/${id}/`);
       fetchEpisodes();
-    } catch (error) {
-      console.error("Failed to delete episode", error);
+    } catch {
+      console.error("Failed to delete episode");
     }
   };
 
@@ -176,13 +165,14 @@ export function EpisodeListView() {
         title={editItem ? "Edit Episode" : "Create Episode"}
         footer={
           <>
-            <Button variant="outline" onClick={handleClose}>
+            <Button variant="outline" onClick={handleClose} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit}>Save</Button>
+            <Button onClick={handleSubmit} disabled={saving || video.metadata.loading}>{saving ? 'Uploading and saving…' : 'Save'}</Button>
           </>
         }
       >
+        {saveError && <StatusAlert>{saveError}</StatusAlert>}
         <FormField label="Title" htmlFor="episode-title">
           <Input id="episode-title" autoFocus name="title" value={formData.title} onChange={handleChange} />
         </FormField>
@@ -195,14 +185,13 @@ export function EpisodeListView() {
             onChange={handleChange}
           />
         </FormField>
-        <VideoUploader
-          label="Episode Video"
-          status={uploader.status}
-          progress={uploader.progress}
-          error={uploader.error}
-          finalUrl={formData.streaming_link}
-          onUpload={uploader.uploadFile}
-        />
+        <FormField label="Episode Video" htmlFor="episode-video">
+          <Input id="episode-video" type="file" accept="video/mp4,video/x-m4v,video/quicktime,video/webm" disabled={saving}
+            onChange={(event) => { video.select(event.target.files?.[0] ?? null); event.target.value = ''; }} />
+          <p className="text-xs text-muted-foreground" role="status">{video.file
+            ? `${video.file.name}. ${video.metadata.loading ? 'Reading video details…' : video.metadata.duration ? 'Duration detected.' : 'Duration unavailable; it will remain unknown.'}`
+            : formData.streaming_link || 'Select a video. Upload starts on Save.'}</p>
+        </FormField>
       </FormDialog>
     </PageShell>
   );
