@@ -1,24 +1,8 @@
-import { NextResponse } from 'next/server';
-import Mux from '@mux/mux-node';
-
-// Initialize Mux client
-const { video } = new Mux({
-  tokenId: process.env.MUX_TOKEN_ID,
-  tokenSecret: process.env.MUX_TOKEN_SECRET,
-});
-
+// Retired: current forms upload through Django's authorized S3 endpoints.
+// Keep this handler closed even if legacy Mux credentials remain configured.
 export async function POST() {
-  try {
-    const upload = await video.uploads.create({
-      cors_origin: '*',
-      new_asset_settings: {
-        playback_policy: ['public'],
-      },
-    });
-
-    return NextResponse.json({ data: upload });
-  } catch {
-    console.error('Error creating Mux upload URL:');
-    return NextResponse.json({ error: 'Error creating upload URL' }, { status: 500 });
-  }
+  return Response.json(
+    { error: "Legacy upload operations are disabled." },
+    { status: 410, headers: { "Cache-Control": "no-store" } },
+  );
 }
