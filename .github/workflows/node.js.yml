@@ -3,7 +3,7 @@
 # pnpm, not npm: pnpm-lock.yaml is the only lockfile, and it is what Vercel
 # installs from. The previous workflow ran `npm ci` against a stale
 # package-lock.json and then `npm test`, a script that does not exist, so it
-# could never pass. There is no test suite; the build is the check.
+# could never pass. Foundation route regression tests now run before the build checks.
 
 name: Node.js CI
 
@@ -38,6 +38,7 @@ jobs:
           cache: "pnpm"
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test:foundation
       - run: pnpm lint
       - run: pnpm exec tsc --noEmit
       - run: pnpm build

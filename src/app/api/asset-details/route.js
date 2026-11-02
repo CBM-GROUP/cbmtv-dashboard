@@ -1,24 +1,8 @@
-import { NextResponse } from 'next/server';
-import Mux from '@mux/mux-node';
-
-const { video } = new Mux({
-  tokenId: process.env.MUX_TOKEN_ID,
-  tokenSecret: process.env.MUX_TOKEN_SECRET,
-});
-
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const assetId = searchParams.get('assetId');
-
-  if (!assetId) {
-    return NextResponse.json({ error: 'Missing assetId' }, { status: 400 });
-  }
-
-  try {
-    const asset = await video.assets.retrieve(assetId);
-    return NextResponse.json({ data: asset });
-  } catch {
-    console.error('Error retrieving asset details:');
-    return NextResponse.json({ error: 'Error retrieving asset details' }, { status: 500 });
-  }
+// Retired: current forms upload through Django's authorized S3 endpoints.
+// Keep this handler closed even if legacy Mux credentials remain configured.
+export async function GET() {
+  return Response.json(
+    { error: "Legacy upload operations are disabled." },
+    { status: 410, headers: { "Cache-Control": "no-store" } },
+  );
 }
