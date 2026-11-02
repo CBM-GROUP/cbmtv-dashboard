@@ -12,6 +12,7 @@ export interface Content {
   streaming_link: string | null;
   thumbnail: string | null;
   director: string;
+  cast?: string[];
   writer: string;
   genre: string;
   country: string;
