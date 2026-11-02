@@ -17,6 +17,7 @@ export type UploadedMedia = Partial<Record<MediaField, { file: File; url: string
 export function contentPayload(content: Omit<Content, 'id'>, main: File | null, duration: string | null): ContentPayload {
   return {
     title: content.title, description: content.description, content_type: content.content_type,
+    category: content.category, format: content.format, genres: content.genres ?? [],
     channel: Number(content.channel), trailer_link: content.trailer_link, streaming_link: content.streaming_link,
     thumbnail: content.thumbnail, director: content.director, writer: content.writer,
     genre: content.genre, country: content.country,

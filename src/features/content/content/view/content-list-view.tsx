@@ -43,11 +43,12 @@ import { changePublication } from "../publication";
 
 import { channelService } from "src/services/channelService";
 import { contentService } from "src/services/contentService";
+import { genreService } from "src/services/genreService";
 
 import { RemoteThumbnail } from "src/components/remote-thumbnail";
 import { useUploadManager } from "@/components/upload/upload-manager";
 
-import { Channel, Content } from "@/types";
+import { CategoryOption, Channel, Content, Genre } from "@/types";
 
 dayjs.extend(duration);
 
@@ -57,12 +58,10 @@ const ALL_CHANNELS = "all";
 const TABS = [
   { value: "all", label: "All" },
   { value: "movies", label: "Movies" },
-  { value: "series", label: "Series" },
-  { value: "miniseries", label: "Miniseries" },
-  { value: "music", label: "Music" },
+  { value: "tv_shows", label: "TV Shows" },
+  { value: "documentaries", label: "Documentaries" },
   { value: "animations", label: "Animations" },
-  { value: "documentary", label: "Documentary" },
-  { value: "original", label: "Original" },
+  { value: "unclassified", label: "Needs classification" },
 ];
 
 function isPlayableUrl(value: string | null | undefined): value is string {
@@ -96,7 +95,7 @@ function PlayAction({ item, onPlay }: { item: Content; onPlay: () => void }) {
     );
   }
 
-  const isContainer =
+  const isContainer = item.format === 'series' ||
     item.content_type === "series" || item.content_type === "miniseries";
 
   return (
@@ -125,6 +124,8 @@ export function ContentListView() {
 
   const [content, setContent] = useState<Content[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Content | null>(null);
   const [playingContent, setPlayingContent] = useState<Content | null>(null);
@@ -137,6 +138,8 @@ export function ContentListView() {
 
   const [tab, setTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [genreFilter, setGenreFilter] = useState('all');
+  const [formatFilter, setFormatFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
@@ -166,6 +169,8 @@ export function ContentListView() {
   useEffect(() => {
     fetchContent();
     fetchChannels();
+    contentService.getCategories().then(setCategories).catch(() => setCategories([]));
+    genreService.getGenres().then(setGenres).catch(() => setGenres([]));
   }, [searchParams]);
 
   // A background upload writes its URL onto the record directly, so the row on
@@ -218,7 +223,9 @@ export function ContentListView() {
       setContent((previous) => previous.map((row) => String(row.id) === id ? saved : row));
       setPublicationMessage({ error: false, text: `${saved.title} ${saved.status === 'approved' ? 'approved' : 'returned to Preview'}.` });
     } catch {
-      setPublicationMessage({ error: true, text: 'The publication change could not be confirmed. Refresh the list and try again.' });
+      setPublicationMessage({ error: true, text: item.status === 'preview'
+        ? 'Approval failed. Check the title’s category, format and genres in Edit, then retry.'
+        : 'The publication change could not be confirmed. Refresh the list and try again.' });
     } finally {
       pendingPublication.current.delete(id);
       setPendingIds([...pendingPublication.current]);
@@ -239,15 +246,21 @@ export function ContentListView() {
     { value: ALL_CHANNELS, label: "All" },
     ...channels.map((channel) => ({ value: String(channel.id), label: channel.name })),
   ];
+  const genreItems = [{ value: 'all', label: 'All genres' },
+    ...genres.map((genre) => ({ value: String(genre.id), label: genre.name }))];
+  const formatItems = [{ value: 'all', label: 'All formats' },
+    { value: 'standalone', label: 'Standalone' }, { value: 'series', label: 'Series' }];
 
   const filteredRows = content
     .filter((item) => {
       if (tab === "all") return true;
-      return item.content_type === (tab === "movies" ? "movie" : tab);
+      return tab === 'unclassified' ? !item.category : item.category === tab;
     })
     .filter((item) =>
       channelId ? String(item.channel) === channelId : true,
     )
+    .filter((item) => formatFilter === 'all' || item.format === formatFilter)
+    .filter((item) => genreFilter === 'all' || item.genres?.includes(Number(genreFilter)))
     .filter((item) =>
       item.title.toLowerCase().includes(searchQuery.toLowerCase()),
     );
@@ -263,12 +276,12 @@ export function ContentListView() {
     <PageShell>
       <PageHeader
         title="Content"
-        description="Movies, series and other titles available to stream."
+        description="Manage the four primary categories, formats, genres and channel ownership."
         actions={
-          <Button onClick={() => handleOpen()}>
-            <PlusIcon />
-            Create Content
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" nativeButton={false} render={<Link href="/content/genres" />}>Genre Management</Button>
+            <Button onClick={() => handleOpen()}><PlusIcon />Create Content</Button>
+          </div>
         }
       />
       {publicationMessage && <div role="status" aria-live="polite">
@@ -300,6 +313,14 @@ export function ContentListView() {
               </SelectItem>
             ))}
           </SelectContent>
+        </Select>
+        <Select items={formatItems} value={formatFilter} onValueChange={(value) => { setFormatFilter(value ?? 'all'); setPage(0); }}>
+          <SelectTrigger aria-label="Format" className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>{formatItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select items={genreItems} value={genreFilter} onValueChange={(value) => { setGenreFilter(value ?? 'all'); setPage(0); }}>
+          <SelectTrigger aria-label="Genre" className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>{genreItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
         </Select>
         <div className="relative w-full sm:w-64">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -335,7 +356,7 @@ export function ContentListView() {
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-24 pl-4">Thumbnail</TableHead>
               <TableHead>Title</TableHead>
-              <TableHead>Content Type</TableHead>
+              <TableHead>Category / Format</TableHead>
               <TableHead>Channel</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="pr-4 text-right">Actions</TableHead>
@@ -355,7 +376,8 @@ export function ContentListView() {
                     <RemoteThumbnail src={item.thumbnail} label={item.title} />
                   </TableCell>
                   <TableCell className="font-medium">{item.title}</TableCell>
-                  <TableCell className="capitalize">{item.content_type}</TableCell>
+                  <TableCell>{categories.find((category) => category.id === item.category)?.label ?? 'Needs classification'}
+                    <span className="block text-xs text-muted-foreground">{item.format ?? item.content_type}</span></TableCell>
                   <TableCell>
                     {channels.find((c) => String(c.id) === String(item.channel))
                       ?.name || "—"}
@@ -401,7 +423,7 @@ export function ContentListView() {
                       >
                         Delete
                       </Button>
-                      {item.content_type === "series" && (
+                      {(item.format === 'series' || item.content_type === 'series') && item.content_type !== 'miniseries' && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -442,6 +464,7 @@ export function ContentListView() {
         onClose={handleClose}
         item={editItem}
         channels={channels}
+        categories={categories}
         onSave={handleSave}
       />
       <Dialog open={Boolean(playingContent)} onOpenChange={(next) => !next && handleClosePlayer()}>

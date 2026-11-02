@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "test:foundation": "node --test tests/legacy-upload.test.mjs",
+    "test:taxonomy": "node --test src/features/content/content/save-content.test.cjs",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",

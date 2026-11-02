@@ -19,34 +19,40 @@ import { contentService } from "src/services/contentService";
 
 import { useUploadManager } from "@/components/upload/upload-manager";
 
-import { Content, Channel } from "@/types";
+import { Content, Channel, CategoryOption, ContentCategory, ContentFormat, Genre } from "@/types";
+import { genreService } from "src/services/genreService";
+import { getApiErrorMessage } from 'src/services/apiError';
 import {
   ContentSaveFailure, MEDIA_FIELDS, contentPayload, saveContentWithMedia,
   type SelectedMedia, type UploadedMedia,
 } from "../save-content";
 
-const CONTENT_TYPES = [
-  { value: "animations", label: "Animations" },
+const FORMATS = [
+  { value: "standalone", label: "Standalone" },
   { value: "series", label: "Series" },
-  { value: "movie", label: "Movie" },
-  { value: "music", label: "Music" },
-  { value: "documentary", label: "Documentary" },
-  { value: "miniseries", label: "Miniseries" },
-  { value: "original", label: "Original" },
 ];
+
+function legacyType(category: ContentCategory, format: ContentFormat) {
+  if (format === 'series') return 'series';
+  return { movies: 'movie', tv_shows: 'tv_show', documentaries: 'documentary', animations: 'animations' }[category];
+}
 
 interface ContentFormProps {
   open: boolean;
   onClose: () => void;
   item: Content | null;
   channels: Channel[];
+  categories: CategoryOption[];
   onSave: () => void;
 }
 
-export function ContentForm({ open, onClose, item: editItem, channels, onSave }: ContentFormProps) {
+export function ContentForm({ open, onClose, item: editItem, channels, categories, onSave }: ContentFormProps) {
   const [formData, setFormData] = useState<Omit<Content, "id">>({
     title: "",
-    content_type: "series",
+    content_type: "movie",
+    category: null,
+    format: 'standalone',
+    genres: [],
     channel: 0,
     description: "",
     trailer_link: "",
@@ -61,6 +67,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     duration: "",
   });
   const [formError, setFormError] = useState("");
+  const [genreChoices, setGenreChoices] = useState<Genre[]>([]);
   const [saving, setSaving] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia>({
     trailer_link: null, streaming_link: null, thumbnail: null,
@@ -83,11 +90,17 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     if (editItem) {
       setFormData({
         ...editItem,
+        category: editItem.category ?? null,
+        format: editItem.format ?? null,
+        genres: editItem.genres ?? [],
       });
     } else {
       setFormData({
         title: "",
-        content_type: "series",
+        content_type: "movie",
+        category: null,
+        format: 'standalone',
+        genres: [],
         channel: 0,
         description: "",
         trailer_link: "",
@@ -104,6 +117,11 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     }
   }, [editItem, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    genreService.getGenres().then(setGenreChoices).catch(() => setFormError('Genres could not be loaded. Close and retry before changing genre assignments.'));
+  }, [open]);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -111,12 +129,20 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     });
   };
 
-  const handleSelectChange = (name: "content_type" | "channel", value: string | null) => {
+  const handleSelectChange = (name: "category" | "format" | "channel", value: string | null) => {
     if (value === null) return;
     if (name === "channel") {
       setFormError("");
     }
-    setFormData({ ...formData, [name]: value });
+    setFormData((previous) => {
+      const next = { ...previous, [name]: name === 'channel' ? Number(value) : value };
+      if (name === 'category' && value === 'movies') next.format = 'standalone';
+      if ((name === 'category' || name === 'format') && next.category && next.format &&
+          editItem?.content_type !== 'miniseries') {
+        next.content_type = legacyType(next.category as ContentCategory, next.format as ContentFormat);
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async () => {
@@ -127,6 +153,14 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
     }
     if (Number(formData.channel) <= 0) {
       setFormError("Select a channel before saving content.");
+      return;
+    }
+    if (!editItem && (!formData.category || !formData.format)) {
+      setFormError('Select one category and a format before saving content.');
+      return;
+    }
+    if (formData.category && !formData.format) {
+      setFormError('Select a format for this category.');
       return;
     }
 
@@ -156,7 +190,9 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
       }
       setFormError(error instanceof ContentSaveFailure && error.stage === "upload"
         ? `Media upload failed. ${editItem ? "Existing content was not changed" : "Content was not created"}. Your form and selected files are ready to retry.`
-        : 'Content save could not be confirmed. Your form and uploaded files are retained. If the response was interrupted, close this form and inspect the content list before continuing.');
+        : error instanceof ContentSaveFailure && error.stage === 'save'
+          ? getApiErrorMessage(error.cause, 'Content save failed. Your form and uploaded files are retained.')
+          : 'Content save could not be confirmed. Your form and uploaded files are retained. If the response was interrupted, close this form and inspect the content list before continuing.');
     } finally {
       setSaving(false);
     }
@@ -164,6 +200,9 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
 
   const channelItems = channels.map((channel) => ({ value: String(channel.id), label: channel.name }));
   const hasChannel = Number(formData.channel) > 0;
+  const availableGenres = genreChoices.filter((genre) =>
+    (formData.category && genre.categories.includes(formData.category) && genre.is_active) ||
+    formData.genres?.includes(genre.id));
 
   return (
     <FormDialog
@@ -176,7 +215,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || metadata.loading || confirmationFailed || Number(formData.channel) <= 0}>
+          <Button onClick={handleSubmit} disabled={saving || metadata.loading || confirmationFailed || Number(formData.channel) <= 0 || (!editItem && !formData.category)}>
             {saving ? "Uploading and saving..." : "Save"}
           </Button>
         </>
@@ -192,21 +231,31 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
         <Input id="content-title" autoFocus name="title" value={formData.title} onChange={handleChange} />
       </FormField>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Content Type" htmlFor="content-type">
+        <FormField label="Primary Category" htmlFor="content-category">
           <Select
-            items={CONTENT_TYPES}
-            value={formData.content_type}
-            onValueChange={(value) => handleSelectChange("content_type", value)}
+            items={categories.map((category) => ({ value: category.id, label: category.label }))}
+            value={formData.category ?? null}
+            onValueChange={(value) => handleSelectChange("category", value)}
           >
-            <SelectTrigger id="content-type" className="w-full">
-              <SelectValue />
+            <SelectTrigger id="content-category" className="w-full">
+              <SelectValue placeholder="Select a category" />
             </SelectTrigger>
             <SelectContent>
-              {CONTENT_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.label}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </FormField>
+        <FormField label="Format" htmlFor="content-format">
+          <Select items={FORMATS} value={formData.format ?? null}
+            onValueChange={(value) => handleSelectChange('format', value)}>
+            <SelectTrigger id="content-format" className="w-full"><SelectValue placeholder="Select a format" /></SelectTrigger>
+            <SelectContent>
+              {FORMATS.filter((item) => formData.category !== 'movies' || item.value === 'standalone').map((item) =>
+                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
             </SelectContent>
           </Select>
         </FormField>
@@ -229,6 +278,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
           </Select>
         </FormField>
       </div>
+      <p className="text-xs text-muted-foreground">One channel owns each title. Series use seasons and episodes; standalone titles can upload a principal video.</p>
       <FormField label="Description" htmlFor="content-description">
         <Input
           id="content-description"
@@ -237,7 +287,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
           onChange={handleChange}
         />
       </FormField>
-      {MEDIA_FIELDS.map((media) => (
+      {MEDIA_FIELDS.filter((media) => media.field !== 'streaming_link' || formData.format !== 'series').map((media) => (
         <FormField key={media.field} label={media.label} htmlFor={`content-${media.field}`}>
           <Input
             id={`content-${media.field}`}
@@ -266,12 +316,29 @@ export function ContentForm({ open, onClose, item: editItem, channels, onSave }:
         <FormField label="Writer" htmlFor="content-writer">
           <Input id="content-writer" name="writer" value={formData.writer} onChange={handleChange} />
         </FormField>
-        <FormField label="Genre" htmlFor="content-genre">
+        <FormField label="Legacy genre text" htmlFor="content-genre">
           <Input id="content-genre" name="genre" value={formData.genre} onChange={handleChange} />
         </FormField>
         <FormField label="Country" htmlFor="content-country">
           <Input id="content-country" name="country" value={formData.country} onChange={handleChange} />
         </FormField>
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Genres</p>
+        {!formData.category && <p className="text-xs text-muted-foreground">Select a category to see applicable genres.</p>}
+        {formData.category && availableGenres.length === 0 && <p className="text-xs text-muted-foreground">No genres available. Create one in Genre Management.</p>}
+        <div className="grid gap-2 sm:grid-cols-2">
+          {availableGenres.map((genre) => <label key={genre.id} className="flex items-center gap-2 text-sm">
+            <Checkbox checked={formData.genres?.includes(genre.id) ?? false} disabled={saving}
+              onCheckedChange={(checked) => setFormData((previous) => ({ ...previous,
+                genres: checked === true
+                  ? [...(previous.genres ?? []), genre.id]
+                  : (previous.genres ?? []).filter((id) => id !== genre.id),
+              }))} />
+            {genre.name}{!genre.is_active ? ' (inactive)' : ''}
+            {formData.category && !genre.categories.includes(formData.category) ? ' (not applicable; remove before saving)' : ''}
+          </label>)}
+        </div>
       </div>
       <div className="flex flex-wrap gap-6">
         {(['is_featured', 'is_trending'] as const).map((flag) => <label key={flag} className="flex items-center gap-2 text-sm">
