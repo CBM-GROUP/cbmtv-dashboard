@@ -89,6 +89,21 @@ test('metadata edits omit status and old metadata; only the selected main video 
   assert.equal(contentPayload(existing, { size: 123456789 }, null).duration, null);
 });
 
+test('taxonomy selections are included in the existing content save payload', () => {
+  const { contentPayload } = require('./save-content.ts');
+  const classified = { ...payload, title: 'Wildlife of Africa', content_type: 'series',
+    category: 'documentaries', format: 'series', genres: [7, 12], channel: 3,
+    genre: 'Legacy Nature', description: 'A series', director: '', writer: '', country: '' };
+  const saved = contentPayload(classified, null, null);
+  assert.equal(saved.category, 'documentaries');
+  assert.equal(saved.format, 'series');
+  assert.deepEqual(saved.genres, [7, 12]);
+  assert.equal(saved.channel, 3);
+  assert.equal(saved.genre, 'Legacy Nature');
+  assert.equal(saved.content_type, 'series');
+  assert.equal('status' in saved, false);
+});
+
 test('an edit response for a different record never attaches the upload', async () => {
   const selected = emptySelection(); selected.streaming_link = { name: 'movie.mp4' };
   let confirmed = 0;

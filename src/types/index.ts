@@ -2,6 +2,9 @@ export interface Content {
   id: string;
   title: string;
   content_type: string;
+  category?: ContentCategory | null;
+  format?: ContentFormat | null;
+  genres?: number[];
   channel: number;
   description: string;
   // Nullable/empty in the API: saved preview records may not have media yet.
@@ -17,6 +20,21 @@ export interface Content {
   duration: string | null;
   is_featured?: boolean;
   is_trending?: boolean;
+}
+
+export type ContentCategory = "movies" | "tv_shows" | "documentaries" | "animations";
+export type ContentFormat = "standalone" | "series";
+
+export interface CategoryOption { id: ContentCategory; label: string }
+
+export interface Genre {
+  id: number;
+  name: string;
+  description: string;
+  categories: ContentCategory[];
+  parent: number | null;
+  is_active: boolean;
+  used_count: number;
 }
 
 /**

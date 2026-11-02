@@ -31,6 +31,12 @@ export const navData = [
     permission: 'content',
   },
   {
+    title: 'Genres',
+    path: '/content/genres',
+    icon: <BiSolidVideos />,
+    permission: 'content',
+  },
+  {
     title: 'Adverts',
     path: '/advert-list',
     icon: <BsMegaphoneFill />,

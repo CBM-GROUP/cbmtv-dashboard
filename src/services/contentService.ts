@@ -1,9 +1,13 @@
 import apiClient from "./api";
 import { createRecord } from './createRecord';
-import { Content, ContentPayload } from "@/types";
+import { CategoryOption, Content, ContentPayload } from "@/types";
 import { normalizeListResponse } from "./normalizeListResponse";
 
 export const contentService = {
+  async getCategories(): Promise<CategoryOption[]> {
+    const response = await apiClient.get<CategoryOption[]>('/api/content/categories/');
+    return response.data;
+  },
   async getContent(): Promise<Content[]> {
     const content: Content[] = [];
     let page = 1;
