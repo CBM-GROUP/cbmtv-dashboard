@@ -93,13 +93,14 @@ test('taxonomy selections are included in the existing content save payload', ()
   const { contentPayload } = require('./save-content.ts');
   const classified = { ...payload, title: 'Wildlife of Africa', content_type: 'series',
     category: 'documentaries', format: 'series', genres: [7, 12], channel: 3,
-    genre: 'Legacy Nature', description: 'A series', director: '', writer: '', country: '' };
+    genre: 'Legacy Nature', description: 'A series', director: '', cast: ['Amina Kato', 'Daniel Ouma'], writer: '', country: '' };
   const saved = contentPayload(classified, null, null);
   assert.equal(saved.category, 'documentaries');
   assert.equal(saved.format, 'series');
   assert.deepEqual(saved.genres, [7, 12]);
   assert.equal(saved.channel, 3);
   assert.equal(saved.genre, 'Legacy Nature');
+  assert.deepEqual(saved.cast, ['Amina Kato', 'Daniel Ouma']);
   assert.equal(saved.content_type, 'series');
   assert.equal('status' in saved, false);
 });

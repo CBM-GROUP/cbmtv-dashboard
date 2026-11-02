@@ -67,6 +67,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, categorie
     duration: "",
   });
   const [formError, setFormError] = useState("");
+  const [castText, setCastText] = useState("");
   const [genreChoices, setGenreChoices] = useState<Genre[]>([]);
   const [saving, setSaving] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia>({
@@ -88,6 +89,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, categorie
     uploadedMedia.current = {};
     creationKey.current = crypto.randomUUID();
     if (editItem) {
+      setCastText((editItem.cast ?? []).join(", "));
       setFormData({
         ...editItem,
         category: editItem.category ?? null,
@@ -95,6 +97,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, categorie
         genres: editItem.genres ?? [],
       });
     } else {
+      setCastText("");
       setFormData({
         title: "",
         content_type: "movie",
@@ -168,7 +171,10 @@ export function ContentForm({ open, onClose, item: editItem, channels, categorie
     setFormError("");
     try {
       await saveContentWithMedia(
-        contentPayload(formData, selectedMedia.streaming_link, metadata.duration), selectedMedia, uploadedMedia.current,
+        contentPayload({
+          ...formData,
+          cast: [...new Set(castText.split(",").map((name) => name.trim()).filter(Boolean))],
+        }, selectedMedia.streaming_link, metadata.duration), selectedMedia, uploadedMedia.current,
         async (file, type, label) => {
           const upload = enqueue(file, type, { label });
           return { jobId: upload.jobId, url: await upload.done };
@@ -312,6 +318,9 @@ export function ContentForm({ open, onClose, item: editItem, channels, categorie
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="Director" htmlFor="content-director">
           <Input id="content-director" name="director" value={formData.director} onChange={handleChange} />
+        </FormField>
+        <FormField label="Actor / Cast (comma separated)" htmlFor="content-cast">
+          <Input id="content-cast" value={castText} onChange={(event) => setCastText(event.target.value)} />
         </FormField>
         <FormField label="Writer" htmlFor="content-writer">
           <Input id="content-writer" name="writer" value={formData.writer} onChange={handleChange} />
