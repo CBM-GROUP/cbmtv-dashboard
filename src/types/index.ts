@@ -50,6 +50,7 @@ export type ContentPayload = Omit<Content, "id" | "status" | "size" | "duration"
 };
 
 export interface Channel {
+  is_active?: boolean;
   id: string;
   name: string;
   description: string;

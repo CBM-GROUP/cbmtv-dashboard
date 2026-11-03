@@ -44,7 +44,7 @@ export function ChannelListView() {
 
   const fetchChannels = async () => {
     try {
-      const data = await channelService.getChannels();
+      const data = await channelService.getChannels('dashboard');
       setChannels(data);
       setError(null);
     } catch (err) {
