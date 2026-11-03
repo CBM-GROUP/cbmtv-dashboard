@@ -4,8 +4,8 @@ import { Channel } from "@/types";
 import { fetchAllPages } from "./fetchAllPages";
 
 export const channelService = {
-  async getChannels(): Promise<Channel[]> {
-    return fetchAllPages<Channel>(apiClient, "/api/channels/");
+  async getChannels(scope: 'public' | 'dashboard' = 'public'): Promise<Channel[]> {
+    return fetchAllPages<Channel>(apiClient, scope === 'dashboard' ? "/api/channels/?scope=dashboard" : "/api/channels/");
   },
 
   async createChannel(data: Omit<Channel, 'id'>, operationKey: string) {

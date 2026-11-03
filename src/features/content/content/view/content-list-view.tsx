@@ -159,7 +159,7 @@ export function ContentListView() {
 
   const fetchChannels = async () => {
     try {
-      const data = await channelService.getChannels();
+      const data = await channelService.getChannels('dashboard');
       setChannels(data);
     } catch {
       console.error("Failed to fetch channels");
