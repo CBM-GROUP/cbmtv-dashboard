@@ -22,6 +22,7 @@ import { createRecord } from '@/services/createRecord';
 import { fetchAllPages } from "src/services/fetchAllPages";
 
 import { useSelectedVideo } from "@/hooks/use-selected-video";
+import { MediaProcessingStatus } from '@/components/upload/media-processing-status';
 
 interface Episode {
   id: string;
@@ -191,6 +192,7 @@ export function EpisodeListView() {
           <p className="text-xs text-muted-foreground" role="status">{video.file
             ? `${video.file.name}. ${video.metadata.loading ? 'Reading video details…' : video.metadata.duration ? 'Duration detected.' : 'Duration unavailable; it will remain unknown.'}`
             : formData.streaming_link || 'Select a video. Upload starts on Save.'}</p>
+          <MediaProcessingStatus referenceUrl={formData.streaming_link} />
         </FormField>
       </FormDialog>
     </PageShell>

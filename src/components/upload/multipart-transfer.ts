@@ -1,6 +1,14 @@
 const CONCURRENCY = 4;
 const MAX_ATTEMPTS = 3;
 
+export interface TransferOptions {
+  parallelism?: number;
+  /** Zero-based indexes confirmed by the server, never inferred from local progress. */
+  uploadedParts?: ReadonlySet<number>;
+  /** Keep successful parts after a network failure so a later attempt can resume. */
+  preserveOnFailure?: boolean;
+}
+
 export async function transferParts(
   fileSize: number,
   partSize: number,
@@ -10,12 +18,20 @@ export async function transferParts(
   finish: (signal: AbortSignal) => Promise<string>,
   abort: () => Promise<void>,
   onProgress: (percent: number) => void,
+  options: TransferOptions = {},
 ): Promise<string> {
+  if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || !Number.isSafeInteger(partSize) || partSize <= 0 ||
+    !Number.isSafeInteger(partCount) || partCount !== Math.ceil(fileSize / partSize)) {
+    throw new Error("Invalid multipart upload dimensions.");
+  }
+  const parallelism = Number.isFinite(options.parallelism)
+    ? Math.max(1, Math.min(8, Math.floor(options.parallelism!))) : CONCURRENCY;
   const transfer = new AbortController();
   const cancelTransfer = () => transfer.abort();
   signal.addEventListener("abort", cancelTransfer, { once: true });
   if (signal.aborted) transfer.abort();
-  const loaded = new Array<number>(partCount).fill(0);
+  const loaded = Array.from({ length: partCount }, (_, index) => options.uploadedParts?.has(index)
+    ? Math.min(partSize, fileSize - index * partSize) : 0);
   let nextPart = 0;
   let completed = false;
   const stopped = () => {
@@ -26,6 +42,7 @@ export async function transferParts(
     while (nextPart < partCount) {
       stopped();
       const index = nextPart++;
+      if (options.uploadedParts?.has(index)) continue;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         stopped();
         try {
@@ -46,7 +63,8 @@ export async function transferParts(
     }
   };
   try {
-    const workers = Array.from({ length: Math.min(CONCURRENCY, partCount) }, worker);
+    report();
+    const workers = Array.from({ length: Math.min(parallelism, partCount) }, worker);
     try {
       await Promise.all(workers);
     } catch (error) {
@@ -61,6 +79,6 @@ export async function transferParts(
     return url;
   } finally {
     signal.removeEventListener("abort", cancelTransfer);
-    if (!completed) await abort().catch(() => undefined);
+    if (!completed && (signal.aborted || !options.preserveOnFailure)) await abort().catch(() => undefined);
   }
 }

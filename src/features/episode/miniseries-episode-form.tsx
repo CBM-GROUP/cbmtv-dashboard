@@ -2,6 +2,7 @@ import type { ChangeEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useSelectedVideo } from "@/hooks/use-selected-video";
+import { MediaProcessingStatus } from '@/components/upload/media-processing-status';
 import { ImageUploader, type ConfirmImage } from "@/components/image-uploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,6 +137,7 @@ export function MiniseriesEpisodeForm({ open, onClose, item: editItem, contentId
         <p className="text-xs text-muted-foreground" role="status">{video.file
           ? `${video.file.name}. ${video.metadata.loading ? 'Reading video details…' : video.metadata.duration ? 'Duration detected.' : 'Duration unavailable; it will remain unknown.'}`
           : formData.streaming_link || 'Select a video. Upload starts on Save.'}</p>
+        <MediaProcessingStatus referenceUrl={formData.streaming_link} />
       </FormField>
       <ImageUploader
         key={`${open}:${editItem?.id ?? 'new'}`}

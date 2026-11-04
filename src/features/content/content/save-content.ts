@@ -37,7 +37,7 @@ export async function saveContentWithMedia(
   payload: ContentPayload,
   selected: SelectedMedia,
   uploaded: UploadedMedia,
-  upload: (file: File, type: "video" | "image", label: string) => Promise<{ jobId: string; url: string }>,
+  upload: (file: File, type: "video" | "image", label: string, field: MediaField) => Promise<{ jobId: string; url: string }>,
   persist: (data: ContentPayload) => Promise<Content>,
   confirm: (jobId: string, endpoint: string, field: MediaField, saved: Content) => void,
   expectedId?: string,
@@ -50,7 +50,7 @@ export async function saveContentWithMedia(
       const cached = uploaded[media.field];
       const result = cached?.file === file
         ? cached
-        : await upload(file, media.type, `${media.label} — ${file.name}`);
+        : await upload(file, media.type, `${media.label} — ${file.name}`, media.field);
       uploaded[media.field] = { file, ...result };
       urls[media.field] = result.url;
     }

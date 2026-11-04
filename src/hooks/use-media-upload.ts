@@ -5,6 +5,7 @@ import { useUploadManager } from "@/components/upload/upload-manager";
 import { uploadConfirmation } from '@/components/upload/attachment';
 
 interface UseMediaUploadOptions {
+  purpose?: 'public' | 'protected';
   /**
    * Where to write the delivery URL when the upload finishes. Pass this
    * whenever the record already exists -- it is what lets the upload survive
@@ -73,6 +74,7 @@ export function useMediaUpload(mediaType: MediaType, options?: UseMediaUploadOpt
 
       if (selection !== generation.current) throw new Error('The upload selection is no longer current.');
       const { jobId: id, done } = enqueue(file, mediaType, {
+        purpose: current?.purpose,
         attach,
         label: current?.label ? `${current.label} — ${file.name}` : file.name,
       });

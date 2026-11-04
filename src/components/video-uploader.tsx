@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { buttonVariants } from "@/components/ui/button";
 import { FormField } from "@/components/form-field";
+import { MediaProcessingStatus } from "@/components/upload/media-processing-status";
 import { cn } from "@/lib/utils";
 
 interface VideoUploaderProps {
@@ -61,6 +62,10 @@ export function VideoUploader({ label, status, progress, error, finalUrl, onUplo
         />
       </div>
       {uploading && <Progress value={progress} aria-label={`${label} upload progress`} />}
+      {finalUrl && <>
+        <p className="text-xs text-muted-foreground">Video source uploaded. Playback readiness is shown below.</p>
+        <MediaProcessingStatus referenceUrl={finalUrl} />
+      </>}
     </FormField>
   );
 }
