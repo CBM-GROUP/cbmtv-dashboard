@@ -56,6 +56,7 @@ export function AdvertForm({ open, onClose, item: editItem, onSave }: AdvertForm
   // In edit mode the advert exists, so a finished upload can write its own
   // URL onto the record and the dialog is free to close.
   const uploader = useMediaUpload("video", {
+    purpose: 'public',
     label: editItem ? `Advert - ${editItem.advert_name}` : "Advert video",
     attach: editItem
       ? { endpoint: `/api/content/adverts/${editItem.id}/`, field: "stream_link" }

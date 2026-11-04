@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 
 import type { UploadJob } from "./upload-manager";
 import { isActive, useUploadManager } from "./upload-manager";
+import { MediaProcessingStatus } from "./media-processing-status";
 
 function statusLine(job: UploadJob) {
   switch (job.status) {
@@ -17,9 +18,11 @@ function statusLine(job: UploadJob) {
     case "uploading":
       return `${job.progress}%`;
     case "attaching":
-      return "Saving link…";
+      return job.mediaType === "video" ? "Source uploaded — saving link…" : "Saving link…";
     case "success":
-      return job.attach ? "Done" : "Done — not attached to a record";
+      return job.mediaType === "video"
+        ? (job.attach ? "Video source uploaded and saved" : "Video source uploaded — not attached to a record")
+        : (job.attach ? "Uploaded and saved" : "Uploaded — not attached to a record");
     case "canceled":
       return "Canceled";
     case "error":
@@ -35,8 +38,8 @@ export function UploadTray() {
 
   const activeCount = jobs.filter(isActive).length;
 
-  // Closing the tab kills the XHR and S3 discards the partial upload, so warn
-  // while anything is still in flight. Browsers show their own generic text.
+  // Reload interrupts requests; reselecting the same file can resume confirmed
+  // multipart parts. Warn while transfers are active using the browser's text.
   useEffect(() => {
     if (activeCount === 0) return undefined;
 
@@ -134,6 +137,10 @@ export function UploadTray() {
                   <Progress value={null} aria-label={`${job.label} in progress`} className="[&_[data-slot=progress-indicator]]:w-1/3 [&_[data-slot=progress-indicator]]:animate-pulse" />
                 ))}
 
+              {job.mediaType === "video" && job.transferComplete && job.deliveryUrl && job.status !== "canceled" && (
+                <MediaProcessingStatus referenceUrl={job.deliveryUrl} />
+              )}
+
               {job.status === "success" && !job.attach && job.deliveryUrl && (
                 <Button
                   variant="link"
@@ -142,7 +149,7 @@ export function UploadTray() {
                   onClick={() => navigator.clipboard?.writeText(job.deliveryUrl)}
                 >
                   <CopyIcon />
-                  Copy URL
+                  {job.mediaType === "video" ? "Copy source reference" : "Copy URL"}
                 </Button>
               )}
             </li>

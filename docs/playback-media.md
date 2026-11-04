@@ -1,0 +1,17 @@
+# Branch 4 dashboard review
+
+Base: `origin/main` at `49614863ef0b59a11e403cb481b284233c5c5166` (merged Branch 3). Worktree: `dashboard-playback-media`, branch `feat/playback-media`. The branch is committed and pushed for review; no merge or deployment was performed.
+
+Video bytes still go straight from browser to S3. Every new video uses multipart, including a single final part for small files; images retain presigned PUT. The backend supplies part size and bounded concurrency. Failed parts retry; transient failure retains the session. Reselecting the same file after reload resumes verified server parts. The local key includes account, purpose, filename, size, modification time and hashes of the first/last MiB. This fingerprint is a practical reselect safeguard, not a full-file integrity checksum; server completion checks every part's size and S3's final size/type. Explicit cancellation aborts multipart. Switching accounts stops work without discarding the prior account's resumable session. Sessions expire after 24 hours; S3 lifecycle and the backend cleanup command handle abandoned parts.
+
+Trailers/adverts explicitly use public uploads. Full movie/episode/part sources use protected uploads. Existing Save still uploads selected files, performs one record write, confirms attachment, and reuses uploaded bytes after a failed Save. Completing transfer does not imply ready-to-play. Backend attachment queues protected transcoding.
+
+Processing status polls every five seconds while active, with cleanup on unmount. Content lists/forms, episode/part forms, shared video upload and the upload tray distinguish source uploaded, queued, processing, ready and failed. Failed transcodes have a retry action. Public uploaded trailers are terminal ready. Unknown legacy URLs are labeled as requiring protected delivery verification. Staff can preview a completed private source with a five-minute backend-authorized S3 URL; this is explicitly a source preview, separate from HLS readiness. Other private-source preview selections cannot overwrite a newer selection.
+
+Session refresh now shares concurrent requests, checks account/session identity on success and failure, preserves credentials after transient network failures, and refuses to install responses from a previous account. Upload jobs also bind ownership before attaching/retrying. The active tray removes old-account jobs on account change; an old completed source remains private and cannot attach under the new account.
+
+Backend contracts are documented in its `docs/playback-media.md`: multipart start/part/status/complete/abort; media status; transcoding retry; source preview. Deploy the matching backend before using this UI. No AWS credentials belong in `NEXT_PUBLIC_*` variables.
+
+Validation: `node --test tests/*.test.*`, `pnpm test:taxonomy`, `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm build`. `test:media` is added to existing CI. Session/race/recovery tests use mocked HTTP and actual provider/hook implementations. AWS throughput, large-file reselect across browser restarts, CORS and operational cleanup still require staging. Existing `next.config.ts` lint warning is unrelated. See the workspace Branch 4 review for final counts and exact status.
+
+Rollback: stop new upload operations, return dashboard to its previous artifact, and keep media records/source objects. Do not delete completed uploads or reset the database. Backend/private-delivery rollout and older client compatibility must be coordinated; the website's Branch 3 dependency remains separate.

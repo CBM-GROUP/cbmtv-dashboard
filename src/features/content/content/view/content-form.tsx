@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MediaProcessingStatus } from '@/components/upload/media-processing-status';
 import {
   Select,
   SelectContent,
@@ -175,8 +176,8 @@ export function ContentForm({ open, onClose, item: editItem, channels, categorie
           ...formData,
           cast: [...new Set(castText.split(",").map((name) => name.trim()).filter(Boolean))],
         }, selectedMedia.streaming_link, metadata.duration), selectedMedia, uploadedMedia.current,
-        async (file, type, label) => {
-          const upload = enqueue(file, type, { label });
+        async (file, type, label, field) => {
+          const upload = enqueue(file, type, { label, purpose: field === 'trailer_link' ? 'public' : 'protected' });
           return { jobId: upload.jobId, url: await upload.done };
         },
         (payload) => editItem
@@ -313,6 +314,7 @@ export function ContentForm({ open, onClose, item: editItem, channels, categorie
               ? `Selected: ${selectedMedia[media.field]?.name}. Upload starts when you click Save.`
               : formData[media.field] || "No media selected"}
           </span>
+          {media.field === 'streaming_link' && <MediaProcessingStatus referenceUrl={formData.streaming_link} />}
         </FormField>
       ))}
       <div className="grid gap-4 sm:grid-cols-2">

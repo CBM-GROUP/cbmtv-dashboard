@@ -41,6 +41,7 @@ jobs:
       - run: pnpm test:foundation
       - run: pnpm test:taxonomy
       - run: pnpm test:homepage
+      - run: pnpm test:media
       - run: pnpm lint
       - run: pnpm exec tsc --noEmit
       - run: pnpm build

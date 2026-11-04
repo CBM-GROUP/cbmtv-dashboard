@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { PlayIcon, PlusIcon, SearchIcon } from "lucide-react";
 import MuxPlayer from "@mux/mux-player-react";
+import apiClient from '@/services/api';
+import { MediaProcessingStatus } from '@/components/upload/media-processing-status';
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,6 +132,7 @@ export function ContentListView() {
   const [editItem, setEditItem] = useState<Content | null>(null);
   const [playingContent, setPlayingContent] = useState<Content | null>(null);
   const [playbackError, setPlaybackError] = useState("");
+  const previewSequence = useRef(0);
   const pendingPublication = useRef(new Set<string>());
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [publicationMessage, setPublicationMessage] = useState<{ error: boolean; text: string } | null>(null);
@@ -233,6 +236,7 @@ export function ContentListView() {
   };
 
   const handleClosePlayer = () => {
+    previewSequence.current += 1;
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.removeAttribute("src");
@@ -375,7 +379,7 @@ export function ContentListView() {
                   <TableCell className="pl-4">
                     <RemoteThumbnail src={item.thumbnail} label={item.title} />
                   </TableCell>
-                  <TableCell className="font-medium">{item.title}</TableCell>
+                  <TableCell className="font-medium">{item.title}<MediaProcessingStatus referenceUrl={item.streaming_link} /></TableCell>
                   <TableCell>{categories.find((category) => category.id === item.category)?.label ?? 'Needs classification'}
                     <span className="block text-xs text-muted-foreground">{item.format ?? item.content_type}</span></TableCell>
                   <TableCell>
@@ -412,8 +416,13 @@ export function ContentListView() {
                       <PlayAction
                         item={item}
                         onPlay={() => {
+                          const sequence = ++previewSequence.current;
                           setPlaybackError("");
-                          setPlayingContent(item);
+                          if (item.streaming_link?.includes('/cbmvideo/private/')) {
+                            void apiClient.post<{ url: string }>('/api/content/media/preview/', { reference_url: item.streaming_link })
+                              .then(({ data }) => { if (previewSequence.current === sequence) setPlayingContent({ ...item, streaming_link: data.url }); })
+                              .catch(() => { if (previewSequence.current === sequence) { setPlayingContent({ ...item, streaming_link: null }); setPlaybackError('Source preview is unavailable. Check upload and processing status.'); } });
+                          } else setPlayingContent(item);
                         }}
                       />
                       <Button
@@ -473,6 +482,7 @@ export function ContentListView() {
             <DialogTitle>{playingContent?.title || "Video playback"}</DialogTitle>
           </DialogHeader>
           {playbackError && <StatusAlert>{playbackError}</StatusAlert>}
+          {playingContent && <p className="text-sm text-muted-foreground">Source preview. Playback readiness is shown in the media processing status.</p>}
           {playingContent?.streaming_link?.includes("mux.com") ? (
             <MuxPlayer
               key={playingContent.streaming_link}
