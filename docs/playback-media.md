@@ -1,6 +1,6 @@
 # Branch 4 dashboard review
 
-Base: `origin/main` at `49614863ef0b59a11e403cb481b284233c5c5166` (merged Branch 3). Worktree: `dashboard-playback-media`, branch `feat/playback-media`. No commit, push or deployment is authorized by this change.
+Base: `origin/main` at `49614863ef0b59a11e403cb481b284233c5c5166` (merged Branch 3). Worktree: `dashboard-playback-media`, branch `feat/playback-media`. The branch is committed and pushed for review; no merge or deployment was performed.
 
 Video bytes still go straight from browser to S3. Every new video uses multipart, including a single final part for small files; images retain presigned PUT. The backend supplies part size and bounded concurrency. Failed parts retry; transient failure retains the session. Reselecting the same file after reload resumes verified server parts. The local key includes account, purpose, filename, size, modification time and hashes of the first/last MiB. This fingerprint is a practical reselect safeguard, not a full-file integrity checksum; server completion checks every part's size and S3's final size/type. Explicit cancellation aborts multipart. Switching accounts stops work without discarding the prior account's resumable session. Sessions expire after 24 hours; S3 lifecycle and the backend cleanup command handle abandoned parts.
 
