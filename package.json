@@ -5,7 +5,7 @@
   "scripts": {
     "test:media": "node --test tests/multipart-transfer.test.mjs tests/upload-recovery.test.cjs tests/api-session.test.cjs",
     "test:homepage": "node --test tests/homepage.test.cjs",
-    "test:foundation": "node --test tests/legacy-upload.test.mjs",
+    "test:foundation": "node --test tests/legacy-upload.test.mjs tests/discovery-analytics.test.cjs",
     "test:taxonomy": "node --test src/features/content/content/save-content.test.cjs",
     "dev": "next dev --turbopack",
     "build": "next build",

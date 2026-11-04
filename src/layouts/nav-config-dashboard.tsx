@@ -1,4 +1,4 @@
-import { MdDashboard } from 'react-icons/md';
+import { MdDashboard, MdInsights } from 'react-icons/md';
 import { BiSolidVideos } from 'react-icons/bi';
 import { BsPersonFill, BsDisplayFill, BsMegaphoneFill, BsFillPeopleFill, BsGearFill } from 'react-icons/bs';
 
@@ -18,6 +18,7 @@ export const navData = [
     icon: <MdDashboard />,
     permission: 'analytics',
   },
+  { title: 'Discovery Analytics', path: '/discovery-analytics', icon: <MdInsights />, permission: 'analytics' },
 
   {
     title: 'Channels',
