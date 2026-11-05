@@ -14,7 +14,7 @@ const summary = Object.fromEntries(['impression', 'video_start', 'first_quartile
 async function fixture(request) {
   const url = new URL(request.url), path = url.pathname.replace('/backend-api', '');
   calls.push(path); let body = {}; try { body = JSON.parse(request.postData || '{}'); } catch {}
-  if (path === '/api/accounts/profile/') return { data: { id: 1, name: 'Local advertising operator', email: 'fixture@example.invalid', is_active: true, is_staff: true, is_superuser: false, dashboard_permissions: ['adverts', ...(canApprove ? ['advertising_approval'] : [])] } };
+  if (path === '/api/accounts/profile/') return { data: { id: 1, name: 'Local advertising operator', email: 'fixture@example.invalid', is_active: true, is_staff: true, is_superuser: false, dashboard_permissions: ['channels', 'content', 'adverts', 'settings', 'users', 'analytics', ...(canApprove ? ['advertising_approval'] : [])] } };
   if (!path.startsWith('/api/advertising/')) return { data: {} };
   if (forbidden) return { status: 403, data: { detail: 'Forbidden fixture' } };
   const relative = path.slice('/api/advertising/'.length).split('/').filter(Boolean), resource = relative[0];
@@ -59,6 +59,14 @@ try {
   for (let i=0;i<100;i++) { try { if ((await fetch('http://127.0.0.1:3015')).ok) break; } catch {} await delay(100); }
   await send('Page.navigate', { url: 'http://127.0.0.1:3015/advertising' });
   await waitFor('document.body.innerText.includes("Advertising delivery disabled")');
+  await evaluate("document.querySelector('[data-slot=sidebar-trigger]').click()");
+  await waitFor("document.querySelectorAll('[data-slot=sidebar-menu-item]').length > 0");
+  const sidebar = await evaluate("Array.from(document.querySelectorAll('[data-slot=sidebar-content] [data-slot=sidebar-menu] > [data-slot=sidebar-menu-item]')).filter(el=>!el.classList.contains('pl-5')).map(el=>el.innerText.trim())");
+  assert.deepEqual(sidebar, ['Dashboard', 'Channels', 'Content', 'General', 'Adverts', 'Homepage Management', 'User Management', 'Profile']);
+  assert.equal(await evaluate("Boolean(document.querySelector('a[href=\"/advert-list\"]') && document.querySelector('a[href=\"/advertising\"]'))"), true);
+  await evaluate("document.querySelector('button[aria-label=\"Advertising settings\"]').click()");
+  await waitFor("document.querySelector('a[href=\"/advertising#placements\"]')");
+  await evaluate("document.querySelector('[data-slot=sheet-close]').click()");
   await click('Advertisers'); await click('Create advertiser'); await input('ad-name', 'Browser sponsor'); await input('ad-email', 'sponsor@example.com'); await click('Save');
   await waitFor('document.body.innerText.includes("Browser sponsor") && !document.getElementById("ad-name")');
   await click('Deactivate'); await waitFor('document.body.innerText.includes("Inactive")'); await click('Activate');
