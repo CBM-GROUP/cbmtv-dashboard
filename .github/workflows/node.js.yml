@@ -1,4 +1,4 @@
-# Install, lint, typecheck and build the dashboard on every push and PR to main.
+# Install, lint, typecheck and build the dashboard on main and stacked PRs.
 #
 # pnpm, not npm: pnpm-lock.yaml is the only lockfile, and it is what Vercel
 # installs from. The previous workflow ran `npm ci` against a stale
@@ -11,7 +11,6 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
 
 concurrency:
   group: ci-${{ github.ref }}
