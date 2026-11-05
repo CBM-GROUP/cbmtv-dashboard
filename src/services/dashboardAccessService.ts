@@ -1,6 +1,6 @@
 import apiClient from './api';
 
-export type DashboardSection = 'channels' | 'content' | 'adverts' | 'settings' | 'users' | 'analytics';
+export type DashboardSection = 'channels' | 'content' | 'adverts' | 'settings' | 'users' | 'analytics' | 'advertising_approval';
 
 export type DashboardRole = {
   id: number;

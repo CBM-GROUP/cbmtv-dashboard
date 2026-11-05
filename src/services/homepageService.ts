@@ -6,6 +6,12 @@ export const sectionLabels: Record<string, string> = {
   continue_watching: 'Continue Watching', new_releases: 'New Releases',
   tv_shows: 'TV Shows', movies: 'Movies', documentaries: 'Documentaries', animations: 'Animations',
 };
+export const advertisingSections: Record<string, string> = {
+  homepage_banner: 'Sponsor banner', homepage_sponsored_section: 'Sponsored collection',
+  homepage_featured_sponsor: 'Featured sponsor', homepage_channel_promotion: 'Sponsored channel',
+  homepage_content_promotion: 'Sponsored title',
+};
+Object.assign(sectionLabels, advertisingSections);
 export type HomepageConfig = {
   sections: { id: string; enabled: boolean }[];
   featured_titles: { content: number; start_at: string | null; end_at: string | null; detail?: Content }[];
@@ -26,7 +32,9 @@ export function moveItem<T>(items: T[], index: number, offset: number): T[] {
 
 export function validateHomepage(config: HomepageConfig): string | null {
   const ids = config.sections.map((section) => section.id);
-  if (ids.length !== Object.keys(sectionLabels).length || new Set(ids).size !== ids.length || ids.some((id) => !sectionLabels[id])) return 'Include every homepage section exactly once.';
+  if (new Set(ids).size !== ids.length || ids.some((id) => !sectionLabels[id]) || Object.keys(sectionLabels).filter(id => !advertisingSections[id]).some(id => !ids.includes(id))) return 'Include every homepage section exactly once.';
+  if (config.sections.filter(row => advertisingSections[row.id] && row.enabled).length > 2) return 'Enable at most two homepage advertising sections.';
+  if (config.sections.slice(0, 3).some(row => advertisingSections[row.id] && row.enabled)) return 'Keep the first three homepage sections for browsing.';
   if (ids[0] !== 'featured_hero') return 'Featured Hero must stay first.';
   if (config.sections.some((section) => ['featured_hero', 'continue_watching'].includes(section.id) && !section.enabled)) return 'Featured Hero and Continue Watching are required.';
   if (!Number.isInteger(config.new_releases.duration) || config.new_releases.duration < 1 || config.new_releases.duration > 1000) return 'Choose a New Releases duration from 1 to 1000.';

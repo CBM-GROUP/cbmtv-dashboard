@@ -21,6 +21,7 @@ import {
 
 const SECTIONS: { value: DashboardSection; label: string }[] = [
   { value: 'analytics', label: 'Analytics' },
+  { value: 'advertising_approval', label: 'Approve advertising' },
   { value: 'channels', label: 'Channels' },
   { value: 'content', label: 'Content and episodes' },
   { value: 'adverts', label: 'Adverts' },
