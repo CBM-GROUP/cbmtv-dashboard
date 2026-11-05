@@ -131,6 +131,15 @@ export default function AdvertisingManagement() {
   const { user } = useAuth()!;
   const canApprove = Boolean(user?.is_superuser || user?.dashboard_permissions?.includes('advertising_approval'));
   const [tab, setTab] = useState<Tab>('Overview');
+  useEffect(() => {
+    const selectSection = () => {
+      const chosen = tabs.find((name) => name.toLowerCase() === window.location.hash.slice(1).toLowerCase());
+      if (chosen) setTab(chosen);
+    };
+    selectSection();
+    window.addEventListener('hashchange', selectSection);
+    return () => window.removeEventListener('hashchange', selectSection);
+  }, []);
   const [data, setData] = useState<Data>(empty);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
