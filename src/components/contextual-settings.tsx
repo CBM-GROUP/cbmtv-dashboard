@@ -12,6 +12,7 @@ type Destination = { label: string; href: string; permission?: string };
 
 function sectionFor(pathname: string): { name: string; destinations: Destination[] } | null {
   if (pathname.startsWith('/advertising')) return { name: 'Advertising', destinations: [
+    { label: 'Advertising activation', href: '/advertising/settings', permission: 'adverts' },
     { label: 'Manage paid placements', href: '/advertising#placements', permission: 'adverts' },
     { label: 'Manage homepage placement order', href: '/homepage', permission: 'content' },
   ] };
