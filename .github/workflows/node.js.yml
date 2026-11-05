@@ -41,6 +41,7 @@ jobs:
       - run: pnpm test:foundation
       - run: pnpm test:taxonomy
       - run: pnpm test:homepage
+      - run: node --test tests/advertising.test.cjs
       - run: pnpm test:media
       - run: pnpm lint
       - run: pnpm exec tsc --noEmit
