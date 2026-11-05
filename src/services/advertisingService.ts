@@ -8,8 +8,23 @@ export type AdReport = {
   by_campaign: AdRecord[]; by_advertiser: AdRecord[]; by_placement: AdRecord[]; by_date: AdRecord[];
   cap_utilization: AdRecord[]; no_ad_reasons: AdRecord[];
 };
+export type AdvertisingSettings = {
+  environment_enabled: boolean;
+  enabled: boolean;
+  homepage_enabled: boolean;
+  video_enabled: boolean;
+  effective_enabled: boolean;
+  effective_homepage_enabled: boolean;
+  effective_video_enabled: boolean;
+};
 const base = '/api/advertising';
 export const advertisingService = {
+  async settings(): Promise<AdvertisingSettings> {
+    return (await apiClient.get<AdvertisingSettings>(`${base}/settings/`)).data;
+  },
+  async saveSettings(values: Pick<AdvertisingSettings, 'enabled' | 'homepage_enabled' | 'video_enabled'>): Promise<AdvertisingSettings> {
+    return (await apiClient.patch<AdvertisingSettings>(`${base}/settings/`, values)).data;
+  },
   async list(resource: Resource, signal?: AbortSignal): Promise<AdRecord[]> {
     const rows: AdRecord[] = [];
     let page = 1;

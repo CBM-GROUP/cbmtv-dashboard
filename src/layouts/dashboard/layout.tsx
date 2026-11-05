@@ -9,6 +9,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { ContextualSettings } from "@/components/contextual-settings";
 
 import { layoutSectionVars } from "../core/css-vars";
 import { dashboardLayoutVars } from "./css-vars";
@@ -45,6 +46,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 })}
               </BreadcrumbList>
             </Breadcrumb>
+            <ContextualSettings />
           </header>
           <div className="flex flex-1 flex-col">{children}</div>
         </SidebarInset>
