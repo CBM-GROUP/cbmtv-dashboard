@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { FormField, StatusAlert } from '@/components/form-field';
 import { contentService } from '@/services/contentService';
 import { channelService } from '@/services/channelService';
-import { homepageService, moveItem, sectionLabels, validateHomepage, type HomepageConfig, type HomepagePreview } from '@/services/homepageService';
+import { homepageService, moveItem, sectionLabels, advertisingSections, validateHomepage, type HomepageConfig, type HomepagePreview } from '@/services/homepageService';
 import type { Channel, Content } from '@/types';
 
 function errorMessage(cause: unknown): string {
@@ -115,6 +115,8 @@ export default function HomepageManagement() {
         <p className="text-sm text-muted-foreground">Channels without available approved titles stay hidden on the website.</p>
       </Card>
       <Card className="p-5"><h2 className="text-lg font-semibold">Homepage Layout</h2>
+        <div className="my-3 flex flex-wrap gap-2">{Object.entries(advertisingSections).filter(([id]) => !config.sections.some(row => row.id === id)).map(([id, label]) => <Button key={id} variant="outline" size="sm" onClick={() => edit({ ...config, sections: [...config.sections, { id, enabled: false }] })}>Add {label}</Button>)}</div>
+        <p className="mb-3 text-sm text-muted-foreground">Sponsored sections also require an enabled placement and approved campaign in Advertising. Enable up to two, after the first three browsing sections.</p>
         {config.sections.map((section, index) => <div key={section.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
           <label className="flex items-center gap-2"><input type="checkbox" checked={section.enabled} disabled={['featured_hero', 'continue_watching'].includes(section.id)} onChange={(event) => edit({ ...config, sections: config.sections.map((row) => row.id === section.id ? { ...row, enabled: event.target.checked } : row) })} />{sectionLabels[section.id]}{['featured_hero', 'continue_watching'].includes(section.id) && <small className="text-muted-foreground">Required</small>}</label>
           <OrderButtons label={sectionLabels[section.id]} index={index} length={config.sections.length} minimum={1} move={(offset) => edit({ ...config, sections: moveItem(config.sections, index, offset) })} />

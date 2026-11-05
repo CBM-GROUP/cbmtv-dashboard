@@ -5,7 +5,7 @@ require('ts-node').register({ transpileOnly: true, compilerOptions: { module: 'C
 const { moveItem, validateHomepage, homepageService, sectionLabels } = require('../src/services/homepageService.ts');
 const api = require('../src/services/api.ts').default;
 const { channelService } = require('../src/services/channelService.ts');
-const config = () => ({ sections: Object.keys(sectionLabels).map((id) => ({ id, enabled: true })), featured_titles: [], featured_channels: [], new_releases: { duration: 30, unit: 'days' } });
+const config = () => ({ sections: Object.keys(sectionLabels).filter(id => !id.startsWith('homepage_')).map((id) => ({ id, enabled: true })), featured_titles: [], featured_channels: [], new_releases: { duration: 30, unit: 'days' } });
 
 test('overview keeps public channel reads while editors explicitly retain dashboard scope over pagination', async () => {
   const original = api.get;
