@@ -11,6 +11,7 @@ export type NavItem = {
 };
 
 export const navData = [
+  { title: 'Advertising', path: '/advertising', icon: <BsMegaphoneFill />, permission: 'adverts' },
   { title: 'Homepage Management', path: '/homepage', icon: <BsDisplayFill />, permission: 'content' },
   {
     title: 'Dashboard',
