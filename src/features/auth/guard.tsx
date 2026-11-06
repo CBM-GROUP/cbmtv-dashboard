@@ -13,6 +13,7 @@ function requiredSection(pathname: string) {
   if (pathname.startsWith('/homepage')) return 'content';
   if (pathname.startsWith('/content-list') || pathname.startsWith('/content/') || pathname.startsWith('/season/')) return 'content';
   if (pathname.startsWith('/advert-list')) return 'adverts';
+  if (pathname.startsWith('/advertising')) return 'adverts';
   if (pathname.startsWith('/settings') || pathname.startsWith('/hero-settings')) return 'settings';
   if (pathname.startsWith('/user-management')) return 'users';
   return null;
