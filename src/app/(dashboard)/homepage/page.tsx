@@ -44,7 +44,6 @@ export default function HomepageManagement() {
   const [titles, setTitles] = useState<Content[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [titleQuery, setTitleQuery] = useState('');
-  const [channelQuery, setChannelQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -77,7 +76,7 @@ export default function HomepageManagement() {
   };
 
   return <PageShell>
-    <PageHeader title="Homepage Management" description="Choose featured titles and channels, then arrange the homepage."
+    <PageHeader title="Homepage Management" description="Choose featured titles, then arrange the homepage. Channels appear automatically."
       actions={<><Button variant="outline" disabled={!config || busy} onClick={() => { setConfig(saved); setPreview(null); setError(''); setMessage('Changes cancelled.'); }}>Cancel</Button>
         <Button variant="outline" disabled={!config || busy} onClick={() => void submit(true)}>Preview</Button>
         <Button disabled={!config || busy} onClick={() => void submit(false)}>{busy ? 'Working...' : 'Save changes'}</Button></>} />
@@ -104,16 +103,6 @@ export default function HomepageManagement() {
             <div className="grid gap-3 sm:grid-cols-2"><FormField label="Starts (optional)" htmlFor={`start-${placement.content}`}><Input id={`start-${placement.content}`} type="datetime-local" value={localTime(placement.start_at)} onChange={(event) => updateDate('start_at', event.target.value)} /></FormField><FormField label="Ends (optional)" htmlFor={`end-${placement.content}`}><Input id={`end-${placement.content}`} type="datetime-local" value={localTime(placement.end_at)} onChange={(event) => updateDate('end_at', event.target.value)} /></FormField></div>
           </div>;
         })}
-      </Card>
-      <Card className="p-5"><h2 className="text-lg font-semibold">Featured Channels</h2>
-        <p className="text-sm text-muted-foreground">The homepage channel carousel now shows every active channel with published content automatically. Saved selections below are retained for compatibility.</p>
-        <Input aria-label="Search channels" placeholder="Search channels..." value={channelQuery} onChange={(event) => setChannelQuery(event.target.value)} />
-        <div className="max-h-48 space-y-2 overflow-auto">{channels.filter((channel) => channel.is_active !== false && !config.featured_channels.some((p) => p.channel === Number(channel.id)) && channel.name.toLowerCase().includes(channelQuery.toLowerCase())).slice(0, 30).map((channel) => <div key={channel.id} className="flex items-center justify-between gap-3 text-sm"><span>{channel.name}</span><Button size="sm" variant="outline" disabled={config.featured_channels.length >= 30} onClick={() => edit({ ...config, featured_channels: [...config.featured_channels, { channel: Number(channel.id), detail: channel }] })}>Add {channel.name}</Button></div>)}</div>
-        {config.featured_channels.map((placement, index) => {
-          const label = placement.detail?.name ?? `Channel ${placement.channel}`;
-          return <div key={placement.channel} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"><strong>{index + 1}. {label}{placement.detail?.is_active === false && <small className="ml-2 text-destructive">Inactive. Remove before saving.</small>}</strong><span className="flex gap-2"><OrderButtons label={label} index={index} length={config.featured_channels.length} move={(offset) => edit({ ...config, featured_channels: moveItem(config.featured_channels, index, offset) })} /><Button variant="outline" size="icon" aria-label={`Remove ${label}`} onClick={() => edit({ ...config, featured_channels: config.featured_channels.filter((_, i) => i !== index) })}><X size={16} /></Button></span></div>;
-        })}
-        <p className="text-sm text-muted-foreground">Channels without available approved titles stay hidden on the website.</p>
       </Card>
       <Card className="p-5"><h2 className="text-lg font-semibold">Homepage Layout</h2>
         <div className="my-3 flex flex-wrap gap-2">{Object.entries(advertisingSections).filter(([id]) => !config.sections.some(row => row.id === id)).map(([id, label]) => <Button key={id} variant="outline" size="sm" onClick={() => edit({ ...config, sections: [...config.sections, { id, enabled: false }] })}>Add {label}</Button>)}</div>
