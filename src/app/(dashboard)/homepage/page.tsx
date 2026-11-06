@@ -106,6 +106,7 @@ export default function HomepageManagement() {
         })}
       </Card>
       <Card className="p-5"><h2 className="text-lg font-semibold">Featured Channels</h2>
+        <p className="text-sm text-muted-foreground">The homepage channel carousel now shows every active channel with published content automatically. Saved selections below are retained for compatibility.</p>
         <Input aria-label="Search channels" placeholder="Search channels..." value={channelQuery} onChange={(event) => setChannelQuery(event.target.value)} />
         <div className="max-h-48 space-y-2 overflow-auto">{channels.filter((channel) => channel.is_active !== false && !config.featured_channels.some((p) => p.channel === Number(channel.id)) && channel.name.toLowerCase().includes(channelQuery.toLowerCase())).slice(0, 30).map((channel) => <div key={channel.id} className="flex items-center justify-between gap-3 text-sm"><span>{channel.name}</span><Button size="sm" variant="outline" disabled={config.featured_channels.length >= 30} onClick={() => edit({ ...config, featured_channels: [...config.featured_channels, { channel: Number(channel.id), detail: channel }] })}>Add {channel.name}</Button></div>)}</div>
         {config.featured_channels.map((placement, index) => {
