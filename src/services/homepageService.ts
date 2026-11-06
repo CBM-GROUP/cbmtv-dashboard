@@ -2,7 +2,7 @@ import apiClient from './api';
 import type { Channel, Content } from '@/types';
 
 export const sectionLabels: Record<string, string> = {
-  featured_hero: 'Featured Hero', featured_channels: 'Featured Channels',
+  featured_hero: 'Featured Hero', featured_channels: 'Channels',
   continue_watching: 'Continue Watching', new_releases: 'New Releases',
   tv_shows: 'TV Shows', movies: 'Movies', documentaries: 'Documentaries', animations: 'Animations',
 };
