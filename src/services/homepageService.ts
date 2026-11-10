@@ -17,6 +17,7 @@ export type HomepageConfig = {
   featured_titles: { content: number; start_at: string | null; end_at: string | null; detail?: Content }[];
   featured_channels: { channel: number; detail?: Channel }[];
   new_releases: { duration: number; unit: 'hours' | 'days' | 'months' | 'years' };
+  advert_insertion: { enabled: boolean; interval: number };
 };
 export type HomepagePreview = { sections: {
   id: string; label: string; enabled: boolean; source: string; items: (Content | Channel)[];
@@ -38,6 +39,7 @@ export function validateHomepage(config: HomepageConfig): string | null {
   if (ids[0] !== 'featured_hero') return 'Featured Hero must stay first.';
   if (config.sections.some((section) => ['featured_hero', 'continue_watching'].includes(section.id) && !section.enabled)) return 'Featured Hero and Continue Watching are required.';
   if (!Number.isInteger(config.new_releases.duration) || config.new_releases.duration < 1 || config.new_releases.duration > 1000) return 'Choose a New Releases duration from 1 to 1000.';
+  if (config.advert_insertion && (!Number.isInteger(config.advert_insertion.interval) || config.advert_insertion.interval < 1 || config.advert_insertion.interval > 1000)) return 'Choose an advert interval from 1 to 1000 movies.';
   if (!['hours', 'days', 'months', 'years'].includes(config.new_releases.unit)) return 'Choose a valid duration unit.';
   if (new Set(config.featured_titles.map((row) => row.content)).size !== config.featured_titles.length) return 'Remove duplicate featured titles.';
   if (new Set(config.featured_channels.map((row) => row.channel)).size !== config.featured_channels.length) return 'Remove duplicate featured channels.';
@@ -49,7 +51,10 @@ export function validateHomepage(config: HomepageConfig): string | null {
 }
 
 export const homepageService = {
-  async get(): Promise<HomepageConfig> { return (await apiClient.get('/api/homepage/manage/')).data; },
+  async get(): Promise<HomepageConfig> {
+    const data = (await apiClient.get('/api/homepage/manage/')).data as HomepageConfig;
+    return { ...data, advert_insertion: data.advert_insertion ?? { enabled: false, interval: 3 } };
+  },
   async save(config: HomepageConfig): Promise<HomepageConfig> {
     const error = validateHomepage(config);
     if (error) throw new Error(error);

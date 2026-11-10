@@ -11,16 +11,20 @@ import { FormField, StatusAlert } from '@/components/form-field';
 import { VideoUploader } from '@/components/video-uploader';
 import { useMediaUpload } from '@/hooks/use-media-upload';
 import { useAuth } from '@/features/auth/context';
-import { advertisingService as api, advertisingError, workflowActions, campaignPayloadValid, type Resource, type AdRecord, type AdReport, type TargetOptions } from '@/services/advertisingService';
+import { AdvertListView } from '@/features/advert/advert/view/advert-list-view';
+import { advertService } from '@/services/advertService';
+import { advertisingService as api, advertisingError, deliveryStatus, campaignPriorityValid, workflowActions, campaignPayloadValid, type Resource, type AdRecord, type AdReport, type TargetOptions } from '@/services/advertisingService';
 
-const tabs = ['Overview', 'Advertisers', 'Campaigns', 'Creatives', 'Placements', 'Reports'] as const;
+const tabs = ['Overview', 'All Adverts', 'Advertisers', 'Campaigns', 'Placements', 'Reports'] as const;
 type Tab = typeof tabs[number];
+const slug = (tab: Tab) => tab.toLowerCase().replaceAll(' ', '-');
 const resources: Resource[] = ['advertisers', 'campaigns', 'creatives', 'placements'];
 type Data = Record<Resource, AdRecord[]>;
 const empty: Data = { advertisers: [], campaigns: [], creatives: [], placements: [] };
 const text = (value: unknown) => value === null || value === undefined ? '—' : typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
 const label = (value: string) => value.replaceAll('decision__', '').replaceAll('campaign__', '').replaceAll('advertiser__', '').replaceAll('_', ' ');
 const inputClass = 'min-h-10 w-full rounded-md border bg-background px-3 text-sm';
+const videoPlacements = new Set(['preroll', 'midroll', 'postroll']);
 const number = (value: unknown) => value === '' || value === undefined || value === null ? null : Number(value);
 
 function Targeting({ value, onChange }: { value: unknown; onChange: (value: unknown) => void }) {
@@ -53,11 +57,14 @@ function Editor({ resource, initial, data, onSaved, cancel }: { resource: Resour
   const [busy, setBusy] = useState(false);
   const [videoUrl, setVideoUrl] = useState(String(initial.media_reference ?? ''));
   const [breakpointText, setBreakpointText] = useState(((initial.breakpoints ?? []) as number[]).join(','));
-  const upload = useMediaUpload('video', { purpose: 'protected', label: 'Advertising creative' });
+  const upload = useMediaUpload('video', { purpose: 'protected', label: 'Campaign advert' });
   const set = (key: string, value: unknown) => setDraft(old => ({ ...old, [key]: value }));
-  const field = (key: string, title: string, type = 'text', required = false) => <FormField key={key} label={title} htmlFor={`ad-${key}`}><Input id={`ad-${key}`} type={type} required={required} min={type === 'number' ? 0 : undefined} value={String(draft[key] ?? '')} onChange={event => set(key, type === 'number' ? number(event.target.value) : event.target.value)} /></FormField>;
-  const select = (key: string, title: string, options: { id: string | number; name: string }[], nullable = false) => <FormField key={key} label={title} htmlFor={`ad-${key}`}><select className={inputClass} id={`ad-${key}`} required={!nullable} value={String(draft[key] ?? '')} onChange={event => set(key, event.target.value === '' ? null : options.some(row => typeof row.id === 'number') ? Number(event.target.value) : event.target.value)}><option value="">{nullable ? 'None' : 'Choose…'}</option>{options.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField>;
-  const placementPicker = <fieldset className="col-span-full rounded-lg border p-3"><legend className="px-2">Eligible placements</legend><div className="grid gap-2 sm:grid-cols-2">{data.placements.map(p => <label key={p.code} className="flex min-h-8 items-center gap-2 text-sm"><input type="checkbox" checked={((draft.placements ?? []) as string[]).includes(p.code!)} onChange={event => set('placements', event.target.checked ? [...((draft.placements ?? []) as string[]), p.code] : ((draft.placements ?? []) as string[]).filter(code => code !== p.code))} />{label(p.code!)}</label>)}</div></fieldset>;
+  const field = (key: string, title: string, type = 'text', required = false) => <FormField key={key} label={title} htmlFor={`ad-${key}`}><Input id={`ad-${key}`} type={type} required={required} min={type === 'number' ? (key === 'priority' ? 1 : 0) : undefined} max={key === 'priority' ? 100 : undefined} value={String(draft[key] ?? '')} onChange={event => set(key, type === 'number' ? number(event.target.value) : event.target.value)} /></FormField>;
+  const select = (key: string, title: string, options: { id: string | number; name: string }[], nullable = false) => <FormField key={key} label={title} htmlFor={`ad-${key}`}><select className={inputClass} id={`ad-${key}`} required={!nullable} disabled={resource === 'creatives' && key === 'campaign' && Boolean(draft.id)} value={String(draft[key] ?? '')} onChange={event => { const value = event.target.value === '' ? null : options.some(row => typeof row.id === 'number') ? Number(event.target.value) : event.target.value; if (resource === 'creatives' && key === 'campaign') setDraft(old => ({ ...old, campaign: value, placements: [] })); else set(key, value); }}><option value="">{nullable ? 'None' : 'Choose…'}</option>{options.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField>;
+  const campaign = data.campaigns.find(row => row.id === Number(draft.campaign));
+  const eligiblePlacements = resource === 'creatives' ? data.placements.filter(p =>
+    campaign && ((campaign.placements ?? []) as string[]).includes(p.code!) && videoPlacements.has(p.code!) === (draft.kind === 'video')) : data.placements;
+  const placementPicker = <fieldset className="col-span-full rounded-lg border p-3"><legend className="px-2">Eligible placements</legend><div className="grid gap-2 sm:grid-cols-2">{eligiblePlacements.map(p => <label key={p.code} className="flex min-h-8 items-center gap-2 text-sm"><input type="checkbox" checked={((draft.placements ?? []) as string[]).includes(p.code!)} onChange={event => set('placements', event.target.checked ? [...((draft.placements ?? []) as string[]), p.code] : ((draft.placements ?? []) as string[]).filter(code => code !== p.code))} />{label(p.code!)}</label>)}</div></fieldset>;
   const uploadImage = async (file?: File) => {
     if (!file) return;
     setBusy(true); setError('');
@@ -65,11 +72,12 @@ function Editor({ resource, initial, data, onSaved, cancel }: { resource: Resour
     catch (cause) { setError(advertisingError(cause)); }
     finally { setBusy(false); }
   };
-  return <Card className="p-5"><h2 className="mb-3 text-lg font-semibold">{draft.id || draft.code ? 'Edit' : 'Create'} {resource.slice(0, -1)}</h2>
+  return <Card className="p-5"><h2 className="mb-3 text-lg font-semibold">{draft.id || draft.code ? 'Edit' : 'Create'} {resource === 'creatives' ? 'advert' : resource.slice(0, -1)}</h2>
     {error && <StatusAlert>{error}</StatusAlert>}
     <form onSubmit={event => {
       event.preventDefault();
       if (resource === 'campaigns' && !campaignPayloadValid(draft)) { setError('Provide a name, advertiser, valid schedule and at least one placement.'); return; }
+      if (resource === 'campaigns' && !campaignPriorityValid(draft.priority)) { setError('Choose a priority from 1 (lowest) to 100 (highest).'); return; }
       setBusy(true); setError('');
       const payload = { ...draft };
       if (resource === 'campaigns') for (const key of ['starts_at', 'ends_at']) payload[key] = new Date(String(payload[key])).toISOString();
@@ -80,13 +88,13 @@ function Editor({ resource, initial, data, onSaved, cancel }: { resource: Resour
       {resource === 'campaigns' && <>
         {select('advertiser', 'Advertiser', data.advertisers.map(a => ({ id: a.id!, name: a.name! })))}
         {field('description', 'Objective or description')}{field('starts_at', 'Starts (local time)', 'datetime-local', true)}{field('ends_at', 'Ends (local time)', 'datetime-local', true)}
-        {field('priority', 'Priority (1–100)', 'number')}{field('impression_limit', 'Lifetime impression cap (blank = unlimited)', 'number')}{field('daily_limit', 'Daily UTC impression cap (blank = unlimited)', 'number')}{field('session_limit', 'Impressions per session (1–20)', 'number')}{field('skippable_after', 'Allow skip after seconds (blank = no skip)', 'number')}
+        {field('priority', 'Priority (1–100)', 'number', true)}<p className="col-span-full text-xs text-muted-foreground">1 is the lowest priority. Higher numbers are served first; equal priorities rotate.</p>{field('impression_limit', 'Lifetime impression cap (blank = unlimited)', 'number')}{field('daily_limit', 'Daily UTC impression cap (blank = unlimited)', 'number')}{field('session_limit', 'Impressions per session (1–20)', 'number')}{field('skippable_after', 'Allow skip after seconds (blank = no skip)', 'number')}
         {placementPicker}<Targeting value={draft.targeting} onChange={value => set('targeting', value)} />
         <p className="col-span-full text-sm text-muted-foreground">Saving changes returns the campaign to Draft and pauses delivery. Submit for review, approve, then resume to activate.</p>
       </>}
       {resource === 'creatives' && <>
         {select('campaign', 'Campaign', data.campaigns.map(c => ({ id: c.id!, name: c.name! })))}
-        <FormField label="Creative type" htmlFor="creative-kind"><select id="creative-kind" className={inputClass} value={String(draft.kind)} onChange={event => { set('kind', event.target.value); set('image', null); set('media', null); }} disabled={Boolean(draft.id)}><option value="image">Image</option><option value="video">Video</option></select></FormField>
+        <FormField label="Advert type" htmlFor="creative-kind"><select id="creative-kind" className={inputClass} value={String(draft.kind)} onChange={event => setDraft(old => ({ ...old, kind: event.target.value, image: null, media: null, placements: [] }))} disabled={Boolean(draft.id)}><option value="image">Image</option><option value="video">Video</option></select></FormField>
         {field('destination_url', 'Approved HTTPS destination', 'url')}{field('cta', 'Call to action (optional)')}{placementPicker}
         {draft.kind === 'image' ? <FormField label="Upload image (JPEG, PNG or WebP, up to 5 MiB)" htmlFor="ad-image"><Input id="ad-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => void uploadImage(event.target.files?.[0])} /><p className="text-xs text-muted-foreground">{draft.image ? 'Verified image attached. Save and preview before approval.' : '320–8192 pixels wide, at least 90 pixels high.'}</p></FormField> : <div className="col-span-full"><VideoUploader label="Advertisement video" status={upload.status} progress={upload.progress} error={upload.error} finalUrl={videoUrl} onUpload={async file => {
           try {
@@ -99,7 +107,7 @@ function Editor({ resource, initial, data, onSaved, cancel }: { resource: Resour
           } catch (cause) { setError(advertisingError(cause)); throw cause; }
         }} /><p className="text-xs text-muted-foreground">Protected HLS processing starts after saving. Only ready videos up to five minutes can be approved.</p></div>}
         <PromotedFields draft={draft} set={set} />
-        <p className="col-span-full text-sm text-muted-foreground">Saving changes resets creative approval. Submit, preview the latest media, then approve.</p>
+        <p className="col-span-full text-sm text-muted-foreground">Saving changes resets advert approval. Submit, preview the latest media, then approve.</p>
       </>}
       {resource === 'placements' && <>
         <p className="font-medium">{label(draft.code!)}</p><label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(draft.enabled)} onChange={event => set('enabled', event.target.checked)} />Enable placement</label>
@@ -132,6 +140,7 @@ export default function AdvertisingManagement() {
   const canApprove = Boolean(user?.is_superuser || user?.dashboard_permissions?.includes('advertising_approval'));
   const [tab, setTab] = useState<Tab>('Overview');
   const [data, setData] = useState<Data>(empty);
+  const [legacyCount, setLegacyCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -143,59 +152,80 @@ export default function AdvertisingManagement() {
   const [from, setFrom] = useState(new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10));
   const [to, setTo] = useState(today);
   const [filterCampaign, setFilterCampaign] = useState('');
+  const [filterCreative, setFilterCreative] = useState('');
   const [filterAdvertiser, setFilterAdvertiser] = useState('');
+  const [campaignFocus, setCampaignFocus] = useState<number | null>(null);
   const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const requested = tabs.find(name => slug(name) === window.location.hash.slice(1));
+      setTab(requested ?? 'Overview');
+    };
+    update(); window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  }, []);
+  const navigateTab = (next: Tab) => { setTab(next); window.location.hash = slug(next); setEditor(null); setPreview(null); };
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');
     void Promise.all(resources.map(resource => api.list(resource, controller.signal))).then(rows => {
       if (!controller.signal.aborted) setData(Object.fromEntries(resources.map((resource, i) => [resource, rows[i]])) as Data);
     }).catch(cause => { if (!controller.signal.aborted) setError(advertisingError(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    void advertService.getAdverts().then(rows => { if (!controller.signal.aborted) setLegacyCount(rows.length); })
+      .catch(() => { if (!controller.signal.aborted) setLegacyCount(null); });
     return () => controller.abort();
   }, [refresh]);
   useEffect(() => {
     const controller = new AbortController(); setReport(null);
     if (!from || !to) return;
-    void api.reports(from, to, number(filterCampaign) ?? undefined, number(filterAdvertiser) ?? undefined, controller.signal).then(result => { if (!controller.signal.aborted) setReport(result); }).catch(cause => { if (!controller.signal.aborted) setError(advertisingError(cause)); });
+    void api.reports(from, to, number(filterCampaign) ?? undefined, number(filterAdvertiser) ?? undefined, controller.signal, number(filterCreative) ?? undefined).then(result => { if (!controller.signal.aborted) setReport(result); }).catch(cause => { if (!controller.signal.aborted) setError(advertisingError(cause)); });
     return () => controller.abort();
-  }, [from, to, filterCampaign, filterAdvertiser, refresh]);
+  }, [from, to, filterCampaign, filterAdvertiser, filterCreative, refresh]);
   const run = async (operation: () => Promise<unknown>, success: string) => {
     setBusy(true); setError(''); setMessage('');
     try { await operation(); setMessage(success); setRefresh(value => value + 1); }
     catch (cause) { setError(advertisingError(cause)); }
     finally { setBusy(false); }
   };
-  const resource = tab.toLowerCase() as Resource;
+  const resource = (tab === 'All Adverts' ? 'creatives' : tab.toLowerCase()) as Resource;
   const rows = resource === 'campaigns' && filterAdvertiser ? data.campaigns.filter(row => Number(row.advertiser) === Number(filterAdvertiser)) : data[resource] ?? [];
   const defaults = (value: Resource): AdRecord => value === 'advertisers' ? { name: '', active: true } : value === 'campaigns' ? {
     name: '', advertiser: null, description: '', starts_at: `${today}T00:00`, ends_at: `${today}T23:59`, priority: 1,
     placements: [], targeting: {}, impression_limit: null, daily_limit: null, session_limit: 3, skippable_after: null,
   } : { name: '', campaign: null, kind: 'image', placements: [], destination_url: '', cta: '', image: null, media: null };
-  return <PageShell><PageHeader title="Advertising" description="Manage sponsors, review creatives and measure recorded delivery." actions={<Button variant="outline" disabled={busy || loading} onClick={() => setRefresh(value => value + 1)}>Refresh</Button>} />
-    <nav aria-label="Advertising workspace" className="mb-5 flex flex-wrap gap-2">{tabs.map(name => <Button key={name} variant={tab === name ? 'default' : 'outline'} onClick={() => { setTab(name); setEditor(null); setPreview(null); }}>{name}</Button>)}</nav>
+  const delivery = deliveryStatus(report);
+  return <PageShell><PageHeader title="Adverts" description="Manage advertisers, campaigns and adverts, and view recorded performance." actions={<Button variant="outline" disabled={busy || loading} onClick={() => setRefresh(value => value + 1)}>Refresh</Button>} />
+    <nav aria-label="Adverts workspace" className="mb-5 flex flex-wrap gap-2">{tabs.map(name => <Button key={name} variant={tab === name ? 'default' : 'outline'} onClick={() => navigateTab(name)}>{name}</Button>)}</nav>
     {error && <StatusAlert>{error}</StatusAlert>}{message && <p className="mb-3 text-sm" role="status">{message}</p>}
     {loading ? <p role="status">Loading advertising…</p> : <>
-      {tab === 'Overview' && <div className="grid gap-4"><Card className="p-5"><h2 className="font-semibold">{report?.enabled ? 'Advertising delivery enabled' : 'Advertising delivery disabled'}</h2><p className="mt-2 text-sm text-muted-foreground">Activation requires the server feature flag, enabled placement, approved campaign, active advertiser and ready approved creative. Editorial Featured Hero remains separate.</p><div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">{resources.map(key => <div key={key}><strong className="text-2xl">{data[key].length}</strong><p className="capitalize text-muted-foreground">{key}</p></div>)}</div></Card><ReportTable title="Recorded performance (selected UTC dates)" rows={report ? [report.summary] : []} /></div>}
+      {tab === 'Overview' && <div className="grid gap-4"><Card className="p-5"><h2 className="font-semibold">{delivery === 'disabled' ? 'Advertising disabled by configuration' : delivery === 'recorded' ? 'Recorded advertising delivery' : delivery === 'unknown' ? 'Delivery status unknown' : 'Monitoring unavailable'}</h2><p className="mt-2 text-sm text-muted-foreground">{delivery === 'recorded' ? 'At least one impression was recorded in the selected period.' : delivery === 'disabled' ? 'The server advertising feature flag is off.' : 'No confirmed delivery failure is available from current monitoring. Check configuration and recorded reports.'}</p><div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{resources.map(key => <div key={key}><strong className="text-2xl">{data[key].length}</strong><p className="capitalize text-muted-foreground">{key === 'creatives' ? 'campaign adverts' : key}</p></div>)}<div><strong className="text-2xl">{legacyCount ?? '—'}</strong><p className="text-muted-foreground">Legacy adverts</p></div></div></Card><ReportTable title="Recorded performance (selected UTC dates)" rows={report ? [report.summary] : []} /></div>}
       {resources.includes(resource) && <div className="grid gap-4">
+        {tab === 'All Adverts' && <div><h2 className="font-semibold">Campaign adverts</h2><p className="text-sm text-muted-foreground">Approved adverts are served only through eligible campaigns and placements.</p></div>}
         {resource === 'campaigns' && <FormField label="Filter campaigns by advertiser" htmlFor="campaign-advertiser-filter"><select id="campaign-advertiser-filter" className={inputClass} value={filterAdvertiser} onChange={event => setFilterAdvertiser(event.target.value)}><option value="">All advertisers</option>{data.advertisers.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField>}
-        {resource !== 'placements' && !editor && <div><Button onClick={() => setEditor({ resource, initial: defaults(resource) })}>Create {resource.slice(0, -1)}</Button></div>}
-        {editor && <Editor key={`${editor.resource}:${editor.initial.id ?? editor.initial.code ?? 'new'}`} {...editor} data={data} cancel={() => setEditor(null)} onSaved={() => { setEditor(null); setMessage('Saved.'); setRefresh(value => value + 1); }} />}
-        {!rows.length ? <Card className="p-5">No {resource} match this view.</Card> : <Card className="min-w-0 overflow-x-auto p-4"><table className="w-full text-left text-sm"><thead><tr>{['Name', 'Status', 'Details', 'Actions'].map(title => <th className="border-b p-3" key={title}>{title}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id ?? row.code}>
+        {resource !== 'placements' && !editor && <div><Button onClick={() => setEditor({ resource, initial: defaults(resource) })}>Create {resource === 'creatives' ? 'campaign advert' : resource.slice(0, -1)}</Button></div>}
+        {editor && editor.resource === resource && <Editor key={`${editor.resource}:${editor.initial.id ?? editor.initial.code ?? 'new'}`} {...editor} data={data} cancel={() => setEditor(null)} onSaved={() => { setEditor(null); setMessage('Saved.'); setRefresh(value => value + 1); }} />}
+        {!rows.length ? <Card className="p-5">{tab === 'All Adverts' ? 'No campaign adverts yet.' : `No ${resource} match this view.`}</Card> : <Card className="min-w-0 overflow-x-auto p-4"><table className="w-full text-left text-sm"><thead><tr>{['Name', 'Status', 'Details', 'Actions'].map(title => <th className="border-b p-3" key={title}>{title}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id ?? row.code}>
           <td className="border-b p-3 font-medium">{row.name ?? label(row.code!)}</td><td className="border-b p-3">{resource === 'advertisers' ? (row.active ? 'Active' : 'Inactive') : resource === 'placements' ? (row.enabled ? 'Enabled' : 'Disabled') : `${text(row.approval)} / ${resource === 'campaigns' ? text(row.status) : row.ready ? 'Ready' : 'Processing or unavailable'}`}</td>
-          <td className="border-b p-3">{resource === 'advertisers' ? <>{text(row.contact_name)}<br />{text(row.email)}<br />{text(row.phone)}<br />Billing: {text(row.billing_reference)}</> : resource === 'campaigns' ? <>{text(row.impressions)} / {text(row.impression_limit)} lifetime impressions<br />{text(row.starts_at)} → {text(row.ends_at)}</> : resource === 'creatives' ? <>{text(row.kind)} · Campaign #{text(row.campaign)}</> : <>{text((row.breakpoints as number[]).join(', ')) || 'No mid-roll breaks'}</>}</td>
+          <td className="border-b p-3">{resource === 'advertisers' ? <>{text(row.contact_name)}<br />{text(row.email)}<br />{text(row.phone)}<br />Billing: {text(row.billing_reference)}</> : resource === 'campaigns' ? <>{text(row.impressions)} / {text(row.impression_limit)} lifetime impressions<br />Priority {text(row.priority)} · {text(row.starts_at)} → {text(row.ends_at)}</> : resource === 'creatives' ? <>{text(row.kind)} · {data.campaigns.find(c => c.id === row.campaign)?.name ?? `Campaign #${text(row.campaign)}`}<br />Placements: {((row.placements ?? []) as string[]).map(label).join(', ') || 'None'}</> : <>{text((row.breakpoints as number[]).join(', ')) || 'No mid-roll breaks'}</>}</td>
           <td className="border-b p-3"><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => {
             const initial = { ...row }; if (resource === 'campaigns') for (const key of ['starts_at', 'ends_at']) { const date = new Date(String(row[key])); initial[key] = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
             setEditor({ resource, initial }); setPreview(null);
           }}>Edit</Button>
-            {resource === 'advertisers' && <><Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => api.save(resource, { id: row.id, active: !row.active }), 'Advertiser updated.')}>{row.active ? 'Deactivate' : 'Activate'}</Button><Button size="sm" variant="outline" onClick={() => { setFilterAdvertiser(String(row.id)); setTab('Campaigns'); }}>View campaigns</Button></>}
-            {resource === 'creatives' && <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => setPreview(await api.preview(row.id!)), 'Preview opened.')}>Preview</Button>}
+            {resource === 'advertisers' && <><Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => api.save(resource, { id: row.id, active: !row.active }), 'Advertiser updated.')}>{row.active ? 'Deactivate' : 'Activate'}</Button><Button size="sm" variant="outline" onClick={() => { setFilterAdvertiser(String(row.id)); navigateTab('Campaigns'); }}>View campaigns</Button></>}
+            {resource === 'campaigns' && <Button size="sm" variant="outline" onClick={() => { setCampaignFocus(row.id!); setEditor(null); setPreview(null); }}>Manage adverts ({data.creatives.filter(ad => ad.campaign === row.id).length})</Button>}
+            {resource === 'creatives' && <><Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => setPreview(await api.preview(row.id!)), 'Preview opened.')}>Preview</Button><Button size="sm" variant="outline" onClick={() => { setFilterCampaign(String(row.campaign ?? '')); setFilterCreative(String(row.id)); navigateTab('Reports'); }}>Report</Button></>}
             {workflowActions(row, resource, canApprove).map(operation => <Button size="sm" variant="outline" key={operation} disabled={busy} onClick={() => void run(() => api.workflow(resource as 'campaigns' | 'creatives', row.id!, operation), `${operation} succeeded.`)}>{label(operation)}</Button>)}
           </div></td>
         </tr>)}</tbody></table></Card>}
-        {preview && <Card className="p-4"><div className="mb-3 flex justify-between"><h2 className="font-semibold">Creative preview</h2><Button size="sm" variant="outline" onClick={() => setPreview(null)}>Close preview</Button></div>{preview.kind === 'video' ? <video src={preview.url} controls playsInline className="max-h-96 w-full" /> : <Image src={preview.url} alt="Advertising creative preview" width={1600} height={900} unoptimized className="max-h-96 w-full object-contain" />}</Card>}
+        {preview && <Card className="p-4"><div className="mb-3 flex justify-between"><h2 className="font-semibold">Advert preview</h2><Button size="sm" variant="outline" onClick={() => setPreview(null)}>Close preview</Button></div>{preview.kind === 'video' ? <video src={preview.url} controls playsInline className="max-h-96 w-full" /> : <Image src={preview.url} alt="Advert preview" width={1600} height={900} unoptimized className="max-h-96 w-full object-contain" />}</Card>}
+        {tab === 'All Adverts' && <AdvertListView embedded />}
+        {tab === 'Campaigns' && campaignFocus !== null && <Card className="grid gap-3 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Adverts in {data.campaigns.find(c => c.id === campaignFocus)?.name ?? `Campaign #${campaignFocus}`}</h2><Button onClick={() => setEditor({ resource: 'creatives', initial: { ...defaults('creatives'), campaign: campaignFocus } })}>Upload advert to campaign</Button></div>
+          {editor?.resource === 'creatives' && <Editor key={`campaign-advert:${editor.initial.id ?? 'new'}`} {...editor} data={data} cancel={() => setEditor(null)} onSaved={() => { setEditor(null); setMessage('Advert saved.'); setRefresh(value => value + 1); }} />}
+          {data.creatives.filter(ad => ad.campaign === campaignFocus).length ? data.creatives.filter(ad => ad.campaign === campaignFocus).map(ad => <div key={ad.id} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-sm"><span>{ad.name} · {text(ad.kind)} · {text(ad.approval)} · {ad.ready ? 'Ready' : 'Processing or unavailable'} · {((ad.placements ?? []) as string[]).map(label).join(', ')}</span><span className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setEditor({ resource: 'creatives', initial: ad })}>Edit</Button><Button size="sm" variant="outline" onClick={() => void run(async () => setPreview(await api.preview(ad.id!)), 'Preview opened.')}>Preview</Button>{workflowActions(ad, 'creatives', canApprove).map(action => <Button size="sm" variant="outline" key={action} onClick={() => void run(() => api.workflow('creatives', ad.id!, action), `${action} succeeded.`)}>{label(action)}</Button>)}</span></div>) : <p className="text-sm text-muted-foreground">No adverts assigned to this campaign yet.</p>}
+        </Card>}
       </div>}
-      {tab === 'Reports' && <div className="grid min-w-0 gap-4"><Card className="grid gap-3 p-4 sm:grid-cols-4"><FormField label="From (UTC)" htmlFor="report-from"><Input id="report-from" type="date" value={from} max={today} onChange={event => setFrom(event.target.value)} /></FormField><FormField label="To (UTC)" htmlFor="report-to"><Input id="report-to" type="date" value={to} max={today} onChange={event => setTo(event.target.value)} /></FormField><FormField label="Campaign" htmlFor="report-campaign"><select id="report-campaign" className={inputClass} value={filterCampaign} onChange={event => setFilterCampaign(event.target.value)}><option value="">All campaigns</option>{data.campaigns.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField><FormField label="Advertiser" htmlFor="report-advertiser"><select id="report-advertiser" className={inputClass} value={filterAdvertiser} onChange={event => setFilterAdvertiser(event.target.value)}><option value="">All advertisers</option>{data.advertisers.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField></Card>
-        {!report ? <p role="status">Choose valid dates to load reports.</p> : <><ReportTable title="Performance" rows={[report.summary]} />{(['by_campaign', 'by_advertiser', 'by_placement', 'by_date', 'cap_utilization', 'no_ad_reasons'] as const).map(key => <ReportTable key={key} title={label(key)} rows={report[key]} />)}</>}
-        <p className="text-sm text-muted-foreground">Rates use recorded impressions and starts. A dash means no denominator. Events are retained for 90 days; lifetime cap counters persist. No billing or revenue is inferred.</p>
+      {tab === 'Reports' && <div className="grid min-w-0 gap-4"><Card className="grid gap-3 p-4 sm:grid-cols-5"><FormField label="From (UTC)" htmlFor="report-from"><Input id="report-from" type="date" value={from} max={today} onChange={event => setFrom(event.target.value)} /></FormField><FormField label="To (UTC)" htmlFor="report-to"><Input id="report-to" type="date" value={to} max={today} onChange={event => setTo(event.target.value)} /></FormField><FormField label="Campaign" htmlFor="report-campaign"><select id="report-campaign" className={inputClass} value={filterCampaign} onChange={event => { setFilterCampaign(event.target.value); setFilterCreative(''); }}><option value="">All campaigns</option>{data.campaigns.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField><FormField label="Advert" htmlFor="report-creative"><select id="report-creative" className={inputClass} value={filterCreative} onChange={event => setFilterCreative(event.target.value)}><option value="">All adverts</option>{data.creatives.filter(row => !filterCampaign || String(row.campaign) === filterCampaign).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField><FormField label="Advertiser" htmlFor="report-advertiser"><select id="report-advertiser" className={inputClass} value={filterAdvertiser} onChange={event => setFilterAdvertiser(event.target.value)}><option value="">All advertisers</option>{data.advertisers.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField></Card>
+        {!report ? <p role="status">Choose valid dates to load reports.</p> : <><ReportTable title="Performance" rows={[report.summary]} />{(['by_campaign', 'by_creative', 'by_advertiser', 'by_placement', 'by_date', 'cap_utilization', 'no_ad_reasons'] as const).map(key => <ReportTable key={key} title={key === 'by_creative' ? 'Individual advert performance' : label(key)} rows={report[key] ?? []} />)}</>}
+        <p className="text-sm text-muted-foreground">Rates use recorded impressions and starts. A dash means no denominator. Events are retained for 90 days; lifetime cap counters persist. Decisions are separate from displayed impressions. No billing or revenue is inferred.</p>
       </div>}
     </>}
   </PageShell>;

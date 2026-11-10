@@ -5,9 +5,20 @@ export type AdRecord = Record<string, unknown> & { id?: number; code?: string; n
 export type TargetOptions = Record<'categories' | 'genres' | 'channels' | 'contents', { id: number | string; name: string }[]>;
 export type AdReport = {
   enabled: boolean; summary: Record<string, number | null>; from: string; to: string;
-  by_campaign: AdRecord[]; by_advertiser: AdRecord[]; by_placement: AdRecord[]; by_date: AdRecord[];
+  by_campaign: AdRecord[]; by_creative: AdRecord[]; by_advertiser: AdRecord[]; by_placement: AdRecord[]; by_date: AdRecord[];
   cap_utilization: AdRecord[]; no_ad_reasons: AdRecord[];
 };
+export type DeliveryStatus = 'monitoring-unavailable' | 'disabled' | 'recorded' | 'unknown';
+export function deliveryStatus(report: AdReport | null): DeliveryStatus {
+  if (!report) return 'monitoring-unavailable';
+  if (!report.enabled) return 'disabled';
+  if ((report.summary.impression ?? 0) > 0) return 'recorded';
+  return 'unknown';
+}
+
+export function campaignPriorityValid(value: unknown): boolean {
+  return Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 100;
+}
 const base = '/api/advertising';
 export const advertisingService = {
   async list(resource: Resource, signal?: AbortSignal): Promise<AdRecord[]> {
@@ -35,14 +46,20 @@ export const advertisingService = {
   },
   async media(reference: string) { return (await apiClient.get<{ media_id?: string }>('/api/content/media/status/', { params: { reference_url: reference } })).data; },
   async targets(q = '', signal?: AbortSignal) { return (await apiClient.get<TargetOptions>(`${base}/targets/`, { params: { q }, signal })).data; },
-  async reports(from: string, to: string, campaign?: number, advertiser?: number, signal?: AbortSignal) {
-    return (await apiClient.get<AdReport>(`${base}/reports/`, { params: { from, to, campaign, advertiser }, signal })).data;
+  async reports(from: string, to: string, campaign?: number, advertiser?: number, signal?: AbortSignal, creative?: number) {
+    const data = (await apiClient.get<AdReport>(`${base}/reports/`, { params: { from, to, campaign, advertiser, ...(creative ? { creative } : {}) }, signal })).data;
+    if (creative && !Array.isArray(data.by_creative)) throw new Error('Individual advert reporting requires the updated backend.');
+    return data;
   },
 };
 
 export function advertisingError(cause: unknown): string {
-  const response = (cause as { response?: { status?: number; data?: unknown } })?.response;
+  const response = (cause as { response?: { status?: number; data?: unknown; headers?: { ['content-type']?: string } } })?.response;
   if (response?.status === 401 || response?.status === 403) return 'Your account does not have permission for this action.';
+  if (response && (response.headers?.['content-type']?.includes('text/html') ||
+      (typeof response.data === 'string' && /^\s*(?:<!doctype|<html|<head|<body)/i.test(response.data)))) {
+    return 'The advertising service returned an unexpected server page. Your changes were not confirmed; check the record before retrying.';
+  }
   const flatten = (value: unknown): string => {
     if (typeof value === 'string') return value;
     if (Array.isArray(value)) return value.map(flatten).join(' ');

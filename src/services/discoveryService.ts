@@ -20,6 +20,7 @@ export type DiscoveryAnalytics = {
   searches_over_time: DayCount[];
   categories: { content__category: string | null; count: number }[];
   channels: { content__channel_id: number; content__channel__name: string; count: number }[];
+  channel_top_content: Record<number, TitleCount[]>;
 };
 
 export const discoveryService = {

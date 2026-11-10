@@ -2,7 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('ts-node').register({ transpileOnly: true, compilerOptions: { module: 'CommonJS', moduleResolution: 'Node' } });
-const { advertisingService: ads, workflowActions, campaignPayloadValid, advertisingError } = require('../src/services/advertisingService.ts');
+const { advertisingService: ads, workflowActions, campaignPayloadValid, campaignPriorityValid, deliveryStatus, advertisingError } = require('../src/services/advertisingService.ts');
+const { advertService } = require('../src/services/advertService.ts');
 const api = require('../src/services/api.ts').default;
 const { validateHomepage, sectionLabels } = require('../src/services/homepageService.ts');
 
@@ -10,6 +11,34 @@ test('campaign form requires schedule, advertiser and placement', () => {
   const valid = { name: 'Launch', advertiser: 1, starts_at: '2026-11-05T12:00:00Z', ends_at: '2026-11-06T12:00:00Z', placements: ['preroll'] };
   assert.equal(campaignPayloadValid(valid), true);
   for (const patch of [{ advertiser: null }, { placements: [] }, { ends_at: valid.starts_at }, { starts_at: 'bad' }, { name: '' }]) assert.equal(campaignPayloadValid({ ...valid, ...patch }), false);
+});
+
+test('priority follows backend range and higher number means higher priority', () => {
+  assert.equal(campaignPriorityValid(1), true);
+  assert.equal(campaignPriorityValid(100), true);
+  for (const value of [0, 101, 1.5, null, '']) assert.equal(campaignPriorityValid(value), false);
+});
+
+test('delivery status never turns absent monitoring or zero events into failure', () => {
+  assert.equal(deliveryStatus(null), 'monitoring-unavailable');
+  assert.equal(deliveryStatus({ enabled: false, summary: { impression: 10 } }), 'disabled');
+  assert.equal(deliveryStatus({ enabled: true, summary: { impression: 0 } }), 'unknown');
+  assert.equal(deliveryStatus({ enabled: true, summary: { impression: 1 } }), 'recorded');
+});
+
+test('HTML targeting failures are not presented as raw server pages', () => {
+  const message = advertisingError({ response: { status: 502, data: '<!DOCTYPE html><html><body>Proxy failure</body></html>' } });
+  assert.match(message, /unexpected server page/);
+  assert.doesNotMatch(message, /<html|Proxy failure/);
+  assert.match(advertisingError({ response: { status: 400, data: { targeting: ['Select existing eligible targets.'] } } }), /targeting: Select existing eligible targets/);
+});
+
+test('legacy adverts still use the mobile-compatible content endpoint', async () => {
+  const original = api.get;
+  try {
+    api.get = async path => { assert.equal(path, '/api/content/adverts/'); return { data: [{ id: '7', advert_name: 'Legacy' }] }; };
+    assert.equal((await advertService.getAdverts())[0].advert_name, 'Legacy');
+  } finally { api.get = original; }
 });
 
 test('workflow actions distinguish approval from delivery and enforce approval permissions', () => {
