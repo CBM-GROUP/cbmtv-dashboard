@@ -186,7 +186,7 @@ export function UserManagementView() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
+        <Card id="users">
           <CardHeader>
             <CardTitle>Invite a user</CardTitle>
             <CardDescription>Create an account and securely share its one-time PIN. It expires after 24 hours. Email delivery is not required.</CardDescription>
@@ -210,7 +210,7 @@ export function UserManagementView() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card id="roles">
           <CardHeader>
             <CardTitle>Roles and permissions</CardTitle>
             <CardDescription>Permissions control the sidebar and the matching backend write APIs.</CardDescription>
