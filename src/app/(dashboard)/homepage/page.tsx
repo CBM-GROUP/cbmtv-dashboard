@@ -104,6 +104,12 @@ export default function HomepageManagement() {
           </div>;
         })}
       </Card>
+      <Card className="p-5"><h2 className="text-lg font-semibold">Featured movie adverts</h2>
+        <p className="text-sm text-muted-foreground">Insert an eligible campaign advert after each interval of featured movies. The movie order stays as selected above; unavailable adverts leave no gap.</p>
+        <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={config.advert_insertion.enabled} onChange={(event) => edit({ ...config, advert_insertion: { ...config.advert_insertion, enabled: event.target.checked } })} />Enable advert insertion</label>
+        <div className="mt-3 max-w-xs"><FormField label="Movies between adverts" htmlFor="advert-interval"><Input id="advert-interval" type="number" min={1} max={1000} step={1} value={config.advert_insertion.interval} onChange={(event) => edit({ ...config, advert_insertion: { ...config.advert_insertion, interval: Number(event.target.value) } })} /></FormField></div>
+        <p className="mt-2 text-xs text-muted-foreground">Default: 3. Adverts must be approved and eligible for the featured sponsor placement.</p>
+      </Card>
       <Card className="p-5"><h2 className="text-lg font-semibold">Homepage Layout</h2>
         <div className="my-3 flex flex-wrap gap-2">{Object.entries(advertisingSections).filter(([id]) => !config.sections.some(row => row.id === id)).map(([id, label]) => <Button key={id} variant="outline" size="sm" onClick={() => edit({ ...config, sections: [...config.sections, { id, enabled: false }] })}>Add {label}</Button>)}</div>
         <p className="mb-3 text-sm text-muted-foreground">Sponsored sections also require an enabled placement and approved campaign in Advertising. Enable up to two, after the first three browsing sections.</p>
