@@ -57,3 +57,19 @@ test('save sends configuration once, returns server result, and preserves server
     await assert.rejects(homepageService.save(config()), /403/);
   } finally { api.put = original; }
 });
+
+test('advert insertion accepts positive intervals and persists the toggle', async () => {
+  const original = api.put;
+  try {
+    api.put = async (_path, payload) => ({ data: payload });
+    for (const interval of [1, 2, 3, 20]) {
+      const draft = { ...config(), advert_insertion: { enabled: true, interval } };
+      assert.equal(validateHomepage(draft), null);
+      assert.deepEqual((await homepageService.save(draft)).advert_insertion, draft.advert_insertion);
+    }
+    for (const interval of [0, -1, 1.5, 1001]) {
+      assert.match(validateHomepage({ ...config(), advert_insertion: { enabled: true, interval } }), /interval/);
+    }
+    assert.equal(validateHomepage({ ...config(), advert_insertion: { enabled: false, interval: 3 } }), null);
+  } finally { api.put = original; }
+});
