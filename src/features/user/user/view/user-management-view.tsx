@@ -19,15 +19,16 @@ import {
   type DashboardUser,
 } from '@/services/dashboardAccessService';
 
-const SECTIONS: { value: DashboardSection; label: string }[] = [
-  { value: 'analytics', label: 'Analytics' },
-  { value: 'advertising_approval', label: 'Approve advertising' },
-  { value: 'channels', label: 'Channels' },
-  { value: 'content', label: 'Content and episodes' },
-  { value: 'adverts', label: 'Adverts' },
-  { value: 'settings', label: 'Settings' },
-  { value: 'users', label: 'User Management' },
+const PERMISSION_GROUPS: { label: string; sections: { value: DashboardSection; label: string }[] }[] = [
+  { label: 'Dashboard and Analytics', sections: [{ value: 'analytics', label: 'Analytics' }] },
+  { label: 'Channels', sections: [{ value: 'channels', label: 'Channels' }] },
+  { label: 'Content', sections: [{ value: 'content', label: 'Content and episodes' }] },
+  { label: 'Adverts', sections: [{ value: 'adverts', label: 'Manage adverts' }] },
+  { label: 'Advertising Approval', sections: [{ value: 'advertising_approval', label: 'Approve advertising' }] },
+  { label: 'User Management', sections: [{ value: 'users', label: 'Manage users and roles' }] },
+  { label: 'Settings', sections: [{ value: 'settings', label: 'Settings' }] },
 ];
+const SECTIONS = PERMISSION_GROUPS.flatMap((group) => group.sections);
 
 function errorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
@@ -46,17 +47,26 @@ function PermissionPicker({ value, onChange }: {
   onChange: (next: DashboardSection[]) => void;
 }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {SECTIONS.map((section) => (
-        <label key={section.value} className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={value.includes(section.value)}
-            onCheckedChange={(checked) => onChange(
-              checked === true ? [...value, section.value] : value.filter((item) => item !== section.value)
-            )}
-          />
-          {section.label}
-        </label>
+    <div className="grid gap-2">
+      {PERMISSION_GROUPS.map((group) => (
+        <details key={group.label} className="rounded-md border px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium">
+            {group.label} <span className="text-muted-foreground">({group.sections.filter((section) => value.includes(section.value)).length}/{group.sections.length})</span>
+          </summary>
+          <div className="grid gap-2 pt-3 sm:grid-cols-2">
+            {group.sections.map((section) => (
+              <label key={section.value} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={value.includes(section.value)}
+                  onCheckedChange={(checked) => onChange(
+                    checked === true ? [...value, section.value] : value.filter((item) => item !== section.value)
+                  )}
+                />
+                {section.label}
+              </label>
+            ))}
+          </div>
+        </details>
       ))}
     </div>
   );
