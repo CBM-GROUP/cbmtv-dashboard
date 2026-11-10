@@ -12,6 +12,7 @@ import { VideoUploader } from '@/components/video-uploader';
 import { useMediaUpload } from '@/hooks/use-media-upload';
 import { useAuth } from '@/features/auth/context';
 import { AdvertListView } from '@/features/advert/advert/view/advert-list-view';
+import { advertService } from '@/services/advertService';
 import { advertisingService as api, advertisingError, deliveryStatus, campaignPriorityValid, workflowActions, campaignPayloadValid, type Resource, type AdRecord, type AdReport, type TargetOptions } from '@/services/advertisingService';
 
 const tabs = ['Overview', 'All Adverts', 'Advertisers', 'Campaigns', 'Placements', 'Reports'] as const;
@@ -139,6 +140,7 @@ export default function AdvertisingManagement() {
   const canApprove = Boolean(user?.is_superuser || user?.dashboard_permissions?.includes('advertising_approval'));
   const [tab, setTab] = useState<Tab>('Overview');
   const [data, setData] = useState<Data>(empty);
+  const [legacyCount, setLegacyCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -167,6 +169,8 @@ export default function AdvertisingManagement() {
     void Promise.all(resources.map(resource => api.list(resource, controller.signal))).then(rows => {
       if (!controller.signal.aborted) setData(Object.fromEntries(resources.map((resource, i) => [resource, rows[i]])) as Data);
     }).catch(cause => { if (!controller.signal.aborted) setError(advertisingError(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    void advertService.getAdverts().then(rows => { if (!controller.signal.aborted) setLegacyCount(rows.length); })
+      .catch(() => { if (!controller.signal.aborted) setLegacyCount(null); });
     return () => controller.abort();
   }, [refresh]);
   useEffect(() => {
@@ -192,7 +196,7 @@ export default function AdvertisingManagement() {
     <nav aria-label="Adverts workspace" className="mb-5 flex flex-wrap gap-2">{tabs.map(name => <Button key={name} variant={tab === name ? 'default' : 'outline'} onClick={() => navigateTab(name)}>{name}</Button>)}</nav>
     {error && <StatusAlert>{error}</StatusAlert>}{message && <p className="mb-3 text-sm" role="status">{message}</p>}
     {loading ? <p role="status">Loading advertising…</p> : <>
-      {tab === 'Overview' && <div className="grid gap-4"><Card className="p-5"><h2 className="font-semibold">{delivery === 'disabled' ? 'Advertising disabled by configuration' : delivery === 'recorded' ? 'Recorded advertising delivery' : delivery === 'unknown' ? 'Delivery status unknown' : 'Monitoring unavailable'}</h2><p className="mt-2 text-sm text-muted-foreground">{delivery === 'recorded' ? 'At least one impression was recorded in the selected period.' : delivery === 'disabled' ? 'The server advertising feature flag is off.' : 'No confirmed delivery failure is available from current monitoring. Check configuration and recorded reports.'}</p><div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">{resources.map(key => <div key={key}><strong className="text-2xl">{data[key].length}</strong><p className="capitalize text-muted-foreground">{key === 'creatives' ? 'campaign adverts' : key}</p></div>)}</div></Card><ReportTable title="Recorded performance (selected UTC dates)" rows={report ? [report.summary] : []} /></div>}
+      {tab === 'Overview' && <div className="grid gap-4"><Card className="p-5"><h2 className="font-semibold">{delivery === 'disabled' ? 'Advertising disabled by configuration' : delivery === 'recorded' ? 'Recorded advertising delivery' : delivery === 'unknown' ? 'Delivery status unknown' : 'Monitoring unavailable'}</h2><p className="mt-2 text-sm text-muted-foreground">{delivery === 'recorded' ? 'At least one impression was recorded in the selected period.' : delivery === 'disabled' ? 'The server advertising feature flag is off.' : 'No confirmed delivery failure is available from current monitoring. Check configuration and recorded reports.'}</p><div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{resources.map(key => <div key={key}><strong className="text-2xl">{data[key].length}</strong><p className="capitalize text-muted-foreground">{key === 'creatives' ? 'campaign adverts' : key}</p></div>)}<div><strong className="text-2xl">{legacyCount ?? '—'}</strong><p className="text-muted-foreground">Legacy adverts</p></div></div></Card><ReportTable title="Recorded performance (selected UTC dates)" rows={report ? [report.summary] : []} /></div>}
       {resources.includes(resource) && <div className="grid gap-4">
         {tab === 'All Adverts' && <div><h2 className="font-semibold">Campaign adverts</h2><p className="text-sm text-muted-foreground">Approved adverts are served only through eligible campaigns and placements.</p></div>}
         {resource === 'campaigns' && <FormField label="Filter campaigns by advertiser" htmlFor="campaign-advertiser-filter"><select id="campaign-advertiser-filter" className={inputClass} value={filterAdvertiser} onChange={event => setFilterAdvertiser(event.target.value)}><option value="">All advertisers</option>{data.advertisers.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></FormField>}
