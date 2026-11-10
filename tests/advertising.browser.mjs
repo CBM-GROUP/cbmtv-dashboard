@@ -4,7 +4,8 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 const root = resolve('.next/advertising-proof'); mkdirSync(root, { recursive: true });
-const next = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', '3015', '-H', '127.0.0.1'], { stdio: 'ignore', windowsHide: true });
+const port = process.env.ADVERTISING_TEST_PORT || '32117';
+const next = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', port, '-H', '127.0.0.1'], { stdio: 'ignore', windowsHide: true });
 const chrome = spawn(process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9345', `--user-data-dir=${root}/chrome-${process.pid}`, 'about:blank'], { stdio: 'ignore', windowsHide: true });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const pending = new Map(), calls = [], mutations = [];
@@ -15,6 +16,7 @@ async function fixture(request) {
   const url = new URL(request.url), path = url.pathname.replace('/backend-api', '');
   calls.push(path); let body = {}; try { body = JSON.parse(request.postData || '{}'); } catch {}
   if (path === '/api/accounts/profile/') return { data: { id: 1, name: 'Local advertising operator', email: 'fixture@example.invalid', is_active: true, is_staff: true, is_superuser: false, dashboard_permissions: ['adverts', ...(canApprove ? ['advertising_approval'] : [])] } };
+  if (path === '/api/content/adverts/') return { data: [] };
   if (!path.startsWith('/api/advertising/')) return { data: {} };
   if (forbidden) return { status: 403, data: { detail: 'Forbidden fixture' } };
   const relative = path.slice('/api/advertising/'.length).split('/').filter(Boolean), resource = relative[0];
@@ -56,9 +58,15 @@ try {
   await send('Page.enable'); await send('Runtime.enable'); await send('Fetch.enable', { patterns: [{ urlPattern: '*backend-api/*' }] });
   const token = `fixture.${Buffer.from(JSON.stringify({ user_id: 1, exp: 9999999999 })).toString('base64url')}.signature`;
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('access_token',${JSON.stringify(token)});localStorage.setItem('refresh_token',${JSON.stringify(token)});` });
-  for (let i=0;i<100;i++) { try { if ((await fetch('http://127.0.0.1:3015')).ok) break; } catch {} await delay(100); }
-  await send('Page.navigate', { url: 'http://127.0.0.1:3015/advertising' });
-  await waitFor('document.body.innerText.includes("Advertising delivery disabled")');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  for (let i=0;i<100;i++) { try { if ((await fetch(`http://127.0.0.1:${port}`)).ok) break; } catch {} await delay(100); }
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/advertising` });
+  await waitFor('document.body.innerText.includes("Advertising disabled by configuration")');
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("button")).some(b=>b.textContent.trim()==="Adverts")'), true);
+  await click('Adverts');
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="Adverts").getAttribute("aria-expanded")'), 'false');
+  await click('Adverts');
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="Adverts").getAttribute("aria-expanded")'), 'true');
   await click('Advertisers'); await click('Create advertiser'); await input('ad-name', 'Browser sponsor'); await input('ad-email', 'sponsor@example.com'); await click('Save');
   await waitFor('document.body.innerText.includes("Browser sponsor") && !document.getElementById("ad-name")');
   await click('Deactivate'); await waitFor('document.body.innerText.includes("Inactive")'); await click('Activate');
@@ -66,16 +74,17 @@ try {
   await evaluate("Array.from(document.querySelectorAll('label')).find(l=>l.textContent.trim()==='content sponsor').querySelector('input').click()");
   await click('Save'); await waitFor('document.body.innerText.includes("Browser campaign") && !document.getElementById("ad-name")');
   await click('submit'); await click('approve'); await click('resume'); await click('pause');
-  await click('Creatives'); await click('Create creative'); await input('ad-name','Browser banner'); await select('ad-campaign','1');
+  await click('Manage adverts (0)'); await click('Upload advert to campaign'); await input('ad-name','Browser banner');
   await evaluate("Array.from(document.querySelectorAll('label')).find(l=>l.textContent.trim()==='content sponsor').querySelector('input').click()");
   await send('DOM.enable'); const { result: dom }=await send('DOM.getDocument'); const { result: picked }=await send('DOM.querySelector',{nodeId:dom.root.nodeId,selector:'#ad-image'});
   await send('DOM.setFileInputFiles',{nodeId:picked.nodeId,files:[resolve('public/cbmtvwhitelogo.png')]});
   await waitFor('document.body.innerText.includes("Verified image attached")'); await click('Save'); await waitFor('!document.getElementById("ad-name")');
-  await click('submit'); await click('Preview'); await waitFor('document.body.innerText.includes("Creative preview")'); await click('approve');
+  await click('submit'); await click('Preview'); await waitFor('document.body.innerText.includes("Advert preview")'); await click('approve');
+  await click('All Adverts'); await waitFor('document.body.innerText.includes("Legacy homepage adverts")');
   await click('Reports'); await waitFor('document.body.innerText.includes("No recorded activity for this range.")');
   const layouts=[];
   for(const width of [390,1440]) { await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<768}); await delay(200); const layout=await evaluate('({width:innerWidth,scrollWidth:document.documentElement.scrollWidth})'); assert.ok(layout.scrollWidth<=layout.width+1);layouts.push(layout); const { result }=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});writeFileSync(join(root,`${width}.png`),Buffer.from(result.data,'base64')); }
-  canApprove=false; await send('Page.reload'); await waitFor('document.body.innerText.includes("Advertising delivery disabled")'); await click('Creatives');
+  canApprove=false; await send('Page.reload'); await waitFor('document.body.innerText.includes("Rates use recorded impressions")'); await click('Overview'); await waitFor('document.body.innerText.includes("Advertising disabled by configuration")'); await click('All Adverts');
   assert.equal(await evaluate("Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()==='approve')"),false);
   forbidden=true; await click('Refresh'); await waitFor('document.body.innerText.includes("does not have permission")');
   writeFileSync(join(root,'results.json'),JSON.stringify({environment:'Headless Chrome, actual dashboard build, intercepted local API fixtures; no production requests',passed:true,advertiser_management:true,campaign_workflow:true,image_upload:true,preview:true,approval_permission:true,reports_empty_state:true,error_handling:true,layouts,mutations,calls},null,2));

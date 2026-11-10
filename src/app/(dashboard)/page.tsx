@@ -40,6 +40,7 @@ export default function Page() {
   const [discovery, setDiscovery] = useState<DiscoveryAnalytics | null>(null);
   const [adReport, setAdReport] = useState<AdReport | null>(null);
   const [campaigns, setCampaigns] = useState<number | null>(null);
+  const [campaignAdverts, setCampaignAdverts] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ variant: 'info' | 'error'; message: string } | null>(null);
@@ -50,12 +51,14 @@ export default function Page() {
       discoveryService.analytics(date(-6), date()),
       advertisingService.reports(date(-6), date()),
       advertisingService.list('campaigns'),
-    ]).then(([counts, activity, ads, campaignRows]) => {
+      advertisingService.list('creatives'),
+    ]).then(([counts, activity, ads, campaignRows, creativeRows]) => {
       if (!active) return;
       if (counts.status === 'fulfilled') setSnapshot(counts.value);
       if (activity.status === 'fulfilled') setDiscovery(activity.value);
       if (ads.status === 'fulfilled') setAdReport(ads.value);
       if (campaignRows.status === 'fulfilled') setCampaigns(campaignRows.value.length);
+      if (creativeRows.status === 'fulfilled') setCampaignAdverts(creativeRows.value.length);
       setLoading(false);
     });
     return () => { active = false; };
@@ -77,7 +80,7 @@ export default function Page() {
       <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Metric title="Channels" value={snapshot?.content.channel_count ?? null} href={can('channels') ? '/channel-list' : undefined} />
         <Metric title="Content" value={snapshot?.content.total_records ?? null} href={can('content') ? '/content-list' : undefined} />
-        <Metric title="Adverts" value={snapshot?.content.advert_count ?? null} href={can('adverts') ? '/advertising#all-adverts' : undefined} />
+        <Metric title="Adverts" value={snapshot && campaignAdverts !== null ? snapshot.content.advert_count + campaignAdverts : null} href={can('adverts') ? '/advertising#all-adverts' : undefined} />
         <Metric title="Users" value={snapshot?.users.total ?? null} href={can('users') ? '/user-management#users' : undefined} />
         <Metric title="Campaigns" value={campaigns} href={can('adverts') ? '/advertising#campaigns' : undefined} />
       </div>

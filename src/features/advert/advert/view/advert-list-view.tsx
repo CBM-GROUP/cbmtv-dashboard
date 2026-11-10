@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { DataTablePagination } from '@/components/data-table-pagination';
 import { PageHeader, PageShell, PageToolbar } from '@/components/page-shell';
+import { StatusAlert } from '@/components/form-field';
 
 import { advertService } from 'src/services/advertService';
 
@@ -23,7 +24,7 @@ import { Advert } from "@/types";
 
 import { AdvertForm } from "./advert-form";
 
-export function AdvertListView() {
+export function AdvertListView({ embedded = false }: { embedded?: boolean }) {
   const [adverts, setAdverts] = useState<Advert[]>([]);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Advert | null>(null);
@@ -31,13 +32,15 @@ export function AdvertListView() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState('');
 
   const fetchAdverts = async () => {
     try {
       const data = await advertService.getAdverts();
       setAdverts(data);
+      setError('');
     } catch {
-      console.error('Failed to fetch adverts');
+      setError('Legacy adverts could not be loaded. Retry before making changes.');
     }
   };
 
@@ -69,17 +72,16 @@ export function AdvertListView() {
       await advertService.deleteAdvert(id);
       fetchAdverts();
     } catch {
-      console.error('Failed to delete advert');
+      setError('The advert could not be deleted. Check its current state and retry.');
     }
   };
 
-  const rows = adverts
-    .filter((item) => item.advert_name.toLowerCase().includes(searchQuery.toLowerCase()))
-    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const filtered = adverts.filter((item) => (item.advert_name ?? '').toLowerCase().includes(searchQuery.toLowerCase()));
+  const rows = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
-    <PageShell>
-      <PageHeader
+    <PageShell className={embedded ? 'p-0 md:p-0' : undefined}>
+      {embedded ? <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold">Legacy homepage adverts</h2><p className="text-sm text-muted-foreground">These adverts continue to serve the mobile homepage strip.</p></div><Button onClick={() => handleOpen()}><PlusIcon />Create legacy advert</Button></div> : <PageHeader
         title="Adverts"
         description="Manage adverts and the image or video slides shown on the homepage."
         actions={
@@ -88,7 +90,8 @@ export function AdvertListView() {
             <Button onClick={() => handleOpen()}><PlusIcon />Create Advert</Button>
           </>
         }
-      />
+      />}
+      {error && <StatusAlert variant="error">{error}</StatusAlert>}
       <PageToolbar>
         <div className="relative w-full sm:w-64">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -147,7 +150,7 @@ export function AdvertListView() {
           </TableBody>
         </Table>
         <DataTablePagination
-          count={adverts.length}
+          count={filtered.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={setPage}
