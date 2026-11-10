@@ -5,7 +5,7 @@ export type AdRecord = Record<string, unknown> & { id?: number; code?: string; n
 export type TargetOptions = Record<'categories' | 'genres' | 'channels' | 'contents', { id: number | string; name: string }[]>;
 export type AdReport = {
   enabled: boolean; summary: Record<string, number | null>; from: string; to: string;
-  by_campaign: AdRecord[]; by_advertiser: AdRecord[]; by_placement: AdRecord[]; by_date: AdRecord[];
+  by_campaign: AdRecord[]; by_creative: AdRecord[]; by_advertiser: AdRecord[]; by_placement: AdRecord[]; by_date: AdRecord[];
   cap_utilization: AdRecord[]; no_ad_reasons: AdRecord[];
 };
 export type DeliveryStatus = 'monitoring-unavailable' | 'disabled' | 'recorded' | 'unknown';
@@ -46,8 +46,10 @@ export const advertisingService = {
   },
   async media(reference: string) { return (await apiClient.get<{ media_id?: string }>('/api/content/media/status/', { params: { reference_url: reference } })).data; },
   async targets(q = '', signal?: AbortSignal) { return (await apiClient.get<TargetOptions>(`${base}/targets/`, { params: { q }, signal })).data; },
-  async reports(from: string, to: string, campaign?: number, advertiser?: number, signal?: AbortSignal) {
-    return (await apiClient.get<AdReport>(`${base}/reports/`, { params: { from, to, campaign, advertiser }, signal })).data;
+  async reports(from: string, to: string, campaign?: number, advertiser?: number, signal?: AbortSignal, creative?: number) {
+    const data = (await apiClient.get<AdReport>(`${base}/reports/`, { params: { from, to, campaign, advertiser, ...(creative ? { creative } : {}) }, signal })).data;
+    if (creative && !Array.isArray(data.by_creative)) throw new Error('Individual advert reporting requires the updated backend.');
+    return data;
   },
 };
 

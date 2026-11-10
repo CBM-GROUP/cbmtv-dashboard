@@ -24,13 +24,11 @@ function Metric({ title, value, href }: { title: string; value: number | null; h
     : <div className="rounded-lg border p-3">{content}</div>;
 }
 
-function DailyBars({ rows }: { rows: DiscoveryAnalytics['views_over_time'] }) {
+function TrendLine({ rows, title }: { rows: { day: string; count: number }[]; title: string }) {
+  if (!rows.length) return <p className="text-sm text-muted-foreground">No recorded {title.toLowerCase()} in this range.</p>;
   const max = Math.max(1, ...rows.map(row => row.count));
-  if (!rows.length) return <p className="text-sm text-muted-foreground">No recorded views in this range.</p>;
-  return <div className="grid gap-2">{rows.map(row => <div key={row.day} className="grid grid-cols-[6rem_1fr_3rem] items-center gap-2 text-xs">
-    <span>{row.day}</span><div className="h-2 rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${row.count / max * 100}%` }} /></div>
-    <span className="text-right tabular-nums">{row.count}</span>
-  </div>)}</div>;
+  const points = rows.map((row, index) => `${20 + index * 560 / Math.max(1, rows.length - 1)},${110 - row.count * 90 / max}`).join(' ');
+  return <div className="rounded border p-2"><svg viewBox="0 0 600 130" className="h-32 w-full" role="img" aria-label={`${title} over time from ${rows[0].day} to ${rows.at(-1)?.day}`}><title>{title} over time</title><line x1="20" y1="110" x2="580" y2="110" stroke="currentColor" opacity=".3" /><polyline points={points} fill="none" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />{rows.map((row, index) => <circle key={row.day} cx={20 + index * 560 / Math.max(1, rows.length - 1)} cy={110 - row.count * 90 / max} r="3" fill="currentColor"><title>{row.day}: {row.count}</title></circle>)}</svg><div className="flex justify-between text-xs text-muted-foreground"><span>{rows[0].day}</span><span>{rows.at(-1)?.day}</span></div></div>;
 }
 
 export default function Page() {
@@ -42,14 +40,19 @@ export default function Page() {
   const [campaigns, setCampaigns] = useState<number | null>(null);
   const [campaignAdverts, setCampaignAdverts] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [from, setFrom] = useState(date(-6));
+  const [to, setTo] = useState(date());
+  const [analyticsError, setAnalyticsError] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ variant: 'info' | 'error'; message: string } | null>(null);
   useEffect(() => {
     let active = true;
+    if (!from || !to || from > to || from < date(-89) || to > date()) { setAnalyticsError('Choose dates within the past 90 UTC days.'); setLoading(false); return; }
+    setLoading(true); setAnalyticsError(''); setDiscovery(null); setAdReport(null);
     Promise.allSettled([
       analyticsService.overview(),
-      discoveryService.analytics(date(-6), date()),
-      advertisingService.reports(date(-6), date()),
+      discoveryService.analytics(from, to),
+      advertisingService.reports(from, to),
       advertisingService.list('campaigns'),
       advertisingService.list('creatives'),
     ]).then(([counts, activity, ads, campaignRows, creativeRows]) => {
@@ -59,10 +62,11 @@ export default function Page() {
       if (ads.status === 'fulfilled') setAdReport(ads.value);
       if (campaignRows.status === 'fulfilled') setCampaigns(campaignRows.value.length);
       if (creativeRows.status === 'fulfilled') setCampaignAdverts(creativeRows.value.length);
+      if (activity.status === 'rejected' && ads.status === 'rejected') setAnalyticsError('Could not load recorded analytics. Check access or retry.');
       setLoading(false);
     });
     return () => { active = false; };
-  }, []);
+  }, [from, to]);
   const sync = async () => {
     setSyncing(true); setSyncMessage(null);
     try {
@@ -87,13 +91,16 @@ export default function Page() {
     </details>
     <section aria-labelledby="performance-title" className="grid gap-3">
       <h2 id="performance-title" className="font-semibold">Performance &amp; Analytics</h2>
+      <div className="flex flex-wrap gap-3 text-sm"><label>From (UTC) <input className="ml-2 rounded border bg-background p-2" aria-label="Analytics from" type="date" min={date(-89)} max={date()} value={from} onChange={event => setFrom(event.target.value)} /></label><label>To (UTC) <input className="ml-2 rounded border bg-background p-2" aria-label="Analytics to" type="date" min={date(-89)} max={date()} value={to} onChange={event => setTo(event.target.value)} /></label></div>
+      {analyticsError && <StatusAlert variant="error">{analyticsError}</StatusAlert>}
       {loading && <p role="status">Loading recorded analytics…</p>}
       <div className="grid gap-3 lg:grid-cols-2">
         <Card><CardHeader><CardTitle>Content performance</CardTitle></CardHeader><CardContent className="grid gap-3">
           {!discovery?.available ? <p className="text-sm text-muted-foreground">Discovery activity is unavailable.</p> : <>
             <div className="grid grid-cols-2 gap-2 text-sm"><span>Qualified views: {discovery.summary.qualified_views}</span><span>Playback starts: {discovery.summary.playback_starts}</span></div>
-            <DailyBars rows={discovery.views_over_time} />
+            <TrendLine rows={discovery.views_over_time} title="Qualified views" />
             <ol className="text-sm">{discovery.most_watched.slice(0, 3).map(row => <li key={row.content_id}>{row.title}: {row.count} views</li>)}</ol>
+            <div className="text-sm"><h3 className="font-medium">Top channels and titles</h3>{discovery.channels.slice(0, 3).map(channel => <div key={channel.content__channel_id} className="mt-1"><strong>{channel.content__channel__name}: {channel.count} views</strong><span className="ml-2 text-muted-foreground">{(discovery.channel_top_content?.[channel.content__channel_id] ?? []).map(item => `${item.title} (${item.count})`).join(', ')}</span></div>)}{!discovery.channels.length && <p>No channel views in this range.</p>}</div>
           </>}
           <Link className="text-sm underline" href="/discovery-analytics">View content and channel analytics</Link>
         </CardContent></Card>
@@ -102,6 +109,7 @@ export default function Page() {
             <p>Recorded impressions: {adReport.summary.impression ?? 0}</p>
             <p>Recorded clicks: {adReport.summary.click ?? 0}</p>
             <p>Campaigns with recorded events: {adReport.by_campaign.length}</p>
+            <TrendLine rows={adReport.by_date.map(row => ({ day: String(row.day), count: Number(row.impression ?? 0) }))} title="Advert impressions" />
           </> : <p className="text-muted-foreground">Advertising reports are unavailable for this account or this request.</p>}
           {can('adverts') && <Link className="underline" href="/advertising#reports">View advertising reports</Link>}
         </CardContent></Card>
