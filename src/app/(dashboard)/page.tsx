@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusAlert } from '@/components/form-field';
 import { PageHeader, PageShell } from '@/components/page-shell';
 import { useAuth } from '@/features/auth/context';
+import { dailySeries } from '@/lib/daily-series';
 
 const date = (offset = 0) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
 
@@ -24,7 +25,8 @@ function Metric({ title, value, href }: { title: string; value: number | null; h
     : <div className="rounded-lg border p-3">{content}</div>;
 }
 
-function TrendLine({ rows, title }: { rows: { day: string; count: number }[]; title: string }) {
+function TrendLine({ rows, title, from, to }: { rows: { day: string; count: number }[]; title: string; from: string; to: string }) {
+  rows = dailySeries(rows, from, to);
   if (!rows.length) return <p className="text-sm text-muted-foreground">No recorded {title.toLowerCase()} in this range.</p>;
   const max = Math.max(1, ...rows.map(row => row.count));
   const points = rows.map((row, index) => `${20 + index * 560 / Math.max(1, rows.length - 1)},${110 - row.count * 90 / max}`).join(' ');
@@ -98,7 +100,7 @@ export default function Page() {
         <Card><CardHeader><CardTitle>Content performance</CardTitle></CardHeader><CardContent className="grid gap-3">
           {!discovery?.available ? <p className="text-sm text-muted-foreground">Discovery activity is unavailable.</p> : <>
             <div className="grid grid-cols-2 gap-2 text-sm"><span>Qualified views: {discovery.summary.qualified_views}</span><span>Playback starts: {discovery.summary.playback_starts}</span></div>
-            <TrendLine rows={discovery.views_over_time} title="Qualified views" />
+            <TrendLine rows={discovery.views_over_time} title="Qualified views" from={from} to={to} />
             <ol className="text-sm">{discovery.most_watched.slice(0, 3).map(row => <li key={row.content_id}>{row.title}: {row.count} views</li>)}</ol>
             <div className="text-sm"><h3 className="font-medium">Top channels and titles</h3>{discovery.channels.slice(0, 3).map(channel => <div key={channel.content__channel_id} className="mt-1"><strong>{channel.content__channel__name}: {channel.count} views</strong><span className="ml-2 text-muted-foreground">{(discovery.channel_top_content?.[channel.content__channel_id] ?? []).map(item => `${item.title} (${item.count})`).join(', ')}</span></div>)}{!discovery.channels.length && <p>No channel views in this range.</p>}</div>
           </>}
@@ -109,7 +111,7 @@ export default function Page() {
             <p>Recorded impressions: {adReport.summary.impression ?? 0}</p>
             <p>Recorded clicks: {adReport.summary.click ?? 0}</p>
             <p>Campaigns with recorded events: {adReport.by_campaign.length}</p>
-            <TrendLine rows={adReport.by_date.map(row => ({ day: String(row.day), count: Number(row.impression ?? 0) }))} title="Advert impressions" />
+            <TrendLine rows={adReport.by_date.map(row => ({ day: String(row.day), count: Number(row.impression ?? 0) }))} title="Advert impressions" from={from} to={to} />
           </> : <p className="text-muted-foreground">Advertising reports are unavailable for this account or this request.</p>}
           {can('adverts') && <Link className="underline" href="/advertising#reports">View advertising reports</Link>}
         </CardContent></Card>
