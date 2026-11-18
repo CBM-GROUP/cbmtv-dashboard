@@ -12,7 +12,7 @@ export function isActive(item: NavItem, location: string): boolean {
   const [path, hash] = item.path.split('#');
   const [current, currentHash] = location.split('#');
   if (path === '/' && current === '/discovery-analytics') return true;
-  if (item.path === '/advertising#all-adverts' && current === '/advert-list') return true;
+  if (item.path === '/advertising#ad-library' && current === '/advert-list') return true;
   if (path === '/content-list' && (current.startsWith('/content/') || current.startsWith('/season/'))) return true;
   if (path !== current) return false;
   return hash ? hash === currentHash : !currentHash;

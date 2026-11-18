@@ -1,6 +1,9 @@
 import apiClient from './api';
 
-export type DashboardSection = 'channels' | 'content' | 'adverts' | 'settings' | 'users' | 'analytics' | 'advertising_approval';
+export type DashboardSection = 'channels' | 'content' | 'adverts' | 'settings' | 'users' | 'analytics' | 'advertising_approval'
+  | 'advertising_view' | 'advertising_manage_clients' | 'advertising_create_campaigns' | 'advertising_upload_creatives'
+  | 'advertising_edit_creatives' | 'advertising_approve_creatives' | 'advertising_manage_delivery'
+  | 'advertising_activate' | 'advertising_reports' | 'advertising_export' | 'advertising_settings';
 
 export type DashboardRole = {
   id: number;

@@ -103,7 +103,9 @@ export function NavContent({ data, slots, sx }: NavContentProps) {
   const pathname = usePathname();
 
   const navData = data.filter((item) => {
-    return !item.permission || user?.is_superuser || user?.dashboard_permissions?.includes(item.permission);
+    return !item.permission || user?.is_superuser || user?.dashboard_permissions?.includes(item.permission)
+      || item.path === '/advertising' && user?.dashboard_permissions?.some(permission => permission.startsWith('advertising_') && permission !== 'advertising_settings')
+      || item.path === '/settings' && user?.dashboard_permissions?.includes('advertising_settings');
   });
 
   return (

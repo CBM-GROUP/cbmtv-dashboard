@@ -22,11 +22,9 @@ export const navData: NavItem[] = [
     { title: 'Genres', path: '/content/genres', permission: 'content' },
   ] },
   { title: 'Adverts', path: '/advertising', icon: <BsMegaphoneFill />, permission: 'adverts', children: [
-    { title: 'Overview', path: '/advertising#overview', permission: 'adverts' },
-    { title: 'All Adverts', path: '/advertising#all-adverts', permission: 'adverts' },
-    { title: 'Advertisers', path: '/advertising#advertisers', permission: 'adverts' },
-    { title: 'Campaigns', path: '/advertising#campaigns', permission: 'adverts' },
-    { title: 'Placements', path: '/advertising#placements', permission: 'adverts' },
+    { title: 'Clients', path: '/advertising#clients', permission: 'adverts' },
+    { title: 'Ad Library', path: '/advertising#ad-library', permission: 'adverts' },
+    { title: 'Delivery', path: '/advertising#delivery', permission: 'adverts' },
     { title: 'Reports', path: '/advertising#reports', permission: 'adverts' },
   ] },
   { title: 'User Management', path: '/user-management', icon: <BsFillPeopleFill />, permission: 'users', children: [
