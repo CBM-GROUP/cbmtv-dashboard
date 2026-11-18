@@ -7,10 +7,11 @@ const { advertService } = require('../src/services/advertService.ts');
 const api = require('../src/services/api.ts').default;
 const { validateHomepage, sectionLabels } = require('../src/services/homepageService.ts');
 
-test('campaign form requires schedule, advertiser and placement', () => {
+test('campaign draft needs a client but can omit schedule and placement', () => {
   const valid = { name: 'Launch', advertiser: 1, starts_at: '2026-11-05T12:00:00Z', ends_at: '2026-11-06T12:00:00Z', placements: ['preroll'] };
   assert.equal(campaignPayloadValid(valid), true);
-  for (const patch of [{ advertiser: null }, { placements: [] }, { ends_at: valid.starts_at }, { starts_at: 'bad' }, { name: '' }]) assert.equal(campaignPayloadValid({ ...valid, ...patch }), false);
+  assert.equal(campaignPayloadValid({ name: 'Draft', advertiser: 1, starts_at: null, ends_at: null, placements: [] }), true);
+  for (const patch of [{ advertiser: null }, { ends_at: valid.starts_at }, { starts_at: 'bad' }, { name: '' }]) assert.equal(campaignPayloadValid({ ...valid, ...patch }), false);
 });
 
 test('priority follows backend range and higher number means higher priority', () => {
@@ -57,6 +58,43 @@ test('advertising service follows all pages without trusting a server-supplied n
     assert.deepEqual(calls.map(c => c.url), ['/api/advertising/campaigns/', '/api/advertising/campaigns/']);
     assert.deepEqual(calls.map(c => c.params.page), [1, 2]);
   } finally { api.get = original; }
+});
+
+test('Phase 1 endpoints retain scoped filters and separate allocation from operation controls', async () => {
+  const previous = { post: api.post, patch: api.patch, get: api.get }, calls = [];
+  try {
+    api.get = async (url, config) => { calls.push({ url, config }); return { data: { count: 0, results: [], backend_enabled: false, by_creative: [] } }; };
+    api.post = async (url, body) => { calls.push({ url, body }); return { data: { status: 'paused' } }; };
+    api.patch = async (url, body) => { calls.push({ url, body }); return { data: { operational_enabled: body.enabled } }; };
+    await ads.page('creatives', 2, undefined, { advertiser: 7, campaign: 8 });
+    await ads.page('allocations', 1, undefined, { creative: 9 });
+    await ads.operation(); await ads.setOperation(false); await ads.allocationWorkflow(5, 'pause');
+    await ads.reports('2026-11-01', '2026-11-05', undefined, 7, undefined, 9);
+    assert.deepEqual(calls[0].config.params, { page: 2, page_size: 20, advertiser: 7, campaign: 8 });
+    assert.deepEqual(calls[1].config.params, { page: 1, page_size: 20, creative: 9 });
+    assert.equal(calls[2].url, '/api/advertising/operation/');
+    assert.deepEqual(calls[3].body, { enabled: false });
+    assert.equal(calls[4].url, '/api/advertising/allocations/5/workflow/');
+    assert.equal(calls[5].config.params.creative, 9);
+  } finally { Object.assign(api, previous); }
+});
+
+test('creative create sends a stable idempotency key and server filters', async () => {
+  const previous = { post: api.post, get: api.get }, calls = [];
+  try {
+    api.post = async (url, body, config) => { calls.push({ url, body, config }); return { data: { id: 42 } }; };
+    api.get = async (url, config) => { calls.push({ url, config }); return { data: { count: 0, results: [], by_creative: [] } }; };
+    const payload = { name: 'Retried artwork', advertiser: 7, kind: 'image', image: 'asset-id' };
+    await ads.save('creatives', payload, 'repeatable-request-key');
+    await ads.save('creatives', payload, 'repeatable-request-key');
+    await ads.page('allocations', 3, undefined, { advertiser: 7, creative: 42, placement: 'content_sponsor', status: 'paused' });
+    await ads.reports('2026-11-01', '2026-11-05', undefined, 7, undefined, 42, 'content_sponsor', 'image');
+    assert.deepEqual(calls[0].config.headers, { 'Idempotency-Key': 'repeatable-request-key' });
+    assert.deepEqual(calls[1].config.headers, calls[0].config.headers);
+    assert.deepEqual(calls[2].config.params, { page: 3, page_size: 20, advertiser: 7, creative: 42, placement: 'content_sponsor', status: 'paused' });
+    assert.equal(calls[3].config.params.kind, 'image');
+    assert.equal(calls[3].config.params.placement, 'content_sponsor');
+  } finally { Object.assign(api, previous); }
 });
 
 test('workflow, upload, preview and reporting preserve API validation and permissions', async () => {

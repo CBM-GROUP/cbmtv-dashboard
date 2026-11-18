@@ -1,12 +1,17 @@
 import apiClient from './api';
 
-export type Resource = 'advertisers' | 'campaigns' | 'creatives' | 'placements';
+export type Resource = 'advertisers' | 'campaigns' | 'creatives' | 'placements' | 'allocations';
 export type AdRecord = Record<string, unknown> & { id?: number; code?: string; name?: string; approval?: string; status?: string; ready?: boolean };
+export type AdPage = { count: number; next: string | null; previous: string | null; results: AdRecord[] };
+export type AdvertisingFilters = { q?: string; advertiser?: number; campaign?: number; creative?: number;
+  placement?: string; status?: string; kind?: string; approval?: string; direct?: boolean; active?: boolean };
+export type AdvertisingOperation = { backend_enabled: boolean; operational_enabled: boolean; effective_enabled: boolean;
+  allocation_strategy_enabled?: boolean; strategy?: 'campaign' | 'allocation' };
 export type TargetOptions = Record<'categories' | 'genres' | 'channels' | 'contents', { id: number | string; name: string }[]>;
 export type AdReport = {
   enabled: boolean; summary: Record<string, number | null>; from: string; to: string;
-  by_campaign: AdRecord[]; by_creative: AdRecord[]; by_advertiser: AdRecord[]; by_placement: AdRecord[]; by_date: AdRecord[];
-  cap_utilization: AdRecord[]; no_ad_reasons: AdRecord[];
+  by_campaign: AdRecord[]; by_advertiser: AdRecord[]; by_creative: AdRecord[]; by_placement: AdRecord[]; by_date: AdRecord[];
+  by_allocation?: AdRecord[]; cap_utilization: AdRecord[]; no_ad_reasons: AdRecord[];
 };
 export type DeliveryStatus = 'monitoring-unavailable' | 'disabled' | 'recorded' | 'unknown';
 export function deliveryStatus(report: AdReport | null): DeliveryStatus {
@@ -21,24 +26,38 @@ export function campaignPriorityValid(value: unknown): boolean {
 }
 const base = '/api/advertising';
 export const advertisingService = {
-  async list(resource: Resource, signal?: AbortSignal): Promise<AdRecord[]> {
+  async page(resource: Resource, page = 1, signal?: AbortSignal, filters: AdvertisingFilters = {}): Promise<AdPage> {
+    const { data } = await apiClient.get<AdPage>(`${base}/${resource}/`, { params: { page, page_size: 20, ...filters }, signal });
+    return data;
+  },
+  async list(resource: Resource, signal?: AbortSignal, filters: AdvertisingFilters = {}): Promise<AdRecord[]> {
     const rows: AdRecord[] = [];
     let page = 1;
     while (true) {
-      const { data } = await apiClient.get<{ results: AdRecord[]; next: string | null }>(`${base}/${resource}/`, { params: { page, page_size: 100 }, signal });
+      const { data } = await apiClient.get<{ results: AdRecord[]; next: string | null }>(`${base}/${resource}/`, { params: { page, page_size: 100, ...filters }, signal });
       rows.push(...data.results);
       if (!data.next) return rows;
       page++;
     }
   },
-  async save(resource: Resource, data: AdRecord) {
+  async get(resource: Resource, id: number | string, signal?: AbortSignal) {
+    return (await apiClient.get<AdRecord>(`${base}/${resource}/${encodeURIComponent(String(id))}/`, { signal })).data;
+  },
+  async save(resource: Resource, data: AdRecord, idempotencyKey?: string) {
     const id = data.id ?? data.code;
-    const { data: result } = await (id === undefined ? apiClient.post<AdRecord>(`${base}/${resource}/`, data) : apiClient.patch<AdRecord>(`${base}/${resource}/${encodeURIComponent(String(id))}/`, data));
+    const { data: result } = await (id === undefined ? apiClient.post<AdRecord>(`${base}/${resource}/`, data,
+      idempotencyKey && resource === 'creatives' ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined)
+      : apiClient.patch<AdRecord>(`${base}/${resource}/${encodeURIComponent(String(id))}/`, data));
     return result;
   },
   async workflow(resource: 'campaigns' | 'creatives', id: number, action: string) {
     return (await apiClient.post<AdRecord>(`${base}/${resource}/${id}/workflow/`, { action })).data;
   },
+  async allocationWorkflow(id: number, action: 'activate' | 'pause' | 'complete') {
+    return (await apiClient.post<AdRecord>(`${base}/allocations/${id}/workflow/`, { action })).data;
+  },
+  async operation() { return (await apiClient.get<AdvertisingOperation>(`${base}/operation/`)).data; },
+  async setOperation(enabled: boolean) { return (await apiClient.patch<AdvertisingOperation>(`${base}/operation/`, { enabled })).data; },
   async preview(id: number) { return (await apiClient.post<{ kind: string; url: string }>(`${base}/creatives/${id}/preview/`, {})).data; },
   async uploadImage(file: File) {
     const form = new FormData(); form.append('file', file);
@@ -46,8 +65,11 @@ export const advertisingService = {
   },
   async media(reference: string) { return (await apiClient.get<{ media_id?: string }>('/api/content/media/status/', { params: { reference_url: reference } })).data; },
   async targets(q = '', signal?: AbortSignal) { return (await apiClient.get<TargetOptions>(`${base}/targets/`, { params: { q }, signal })).data; },
-  async reports(from: string, to: string, campaign?: number, advertiser?: number, signal?: AbortSignal, creative?: number) {
-    const data = (await apiClient.get<AdReport>(`${base}/reports/`, { params: { from, to, campaign, advertiser, ...(creative ? { creative } : {}) }, signal })).data;
+  async reports(from: string, to: string, campaign?: number, advertiser?: number, signal?: AbortSignal,
+    creative?: number, placement?: string, kind?: string, allocation?: number) {
+    const data = (await apiClient.get<AdReport>(`${base}/reports/`, { params: { from, to, campaign, advertiser,
+      ...(creative ? { creative } : {}), ...(placement ? { placement } : {}), ...(kind ? { kind } : {}),
+      ...(allocation ? { allocation } : {}) }, signal })).data;
     if (creative && !Array.isArray(data.by_creative)) throw new Error('Individual advert reporting requires the updated backend.');
     return data;
   },
@@ -84,5 +106,6 @@ export function workflowActions(row: AdRecord, resource: Resource, canApprove: b
 
 export function campaignPayloadValid(row: AdRecord) {
   const start = Date.parse(String(row.starts_at ?? '')), end = Date.parse(String(row.ends_at ?? ''));
-  return Boolean(row.name && row.advertiser && Number.isFinite(start) && end > start && Array.isArray(row.placements) && row.placements.length);
+  const scheduled = !row.starts_at && !row.ends_at || Number.isFinite(start) && end > start;
+  return Boolean(row.name && row.advertiser && scheduled);
 }

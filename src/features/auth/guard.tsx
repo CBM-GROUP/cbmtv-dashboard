@@ -25,7 +25,9 @@ export const AuthGuard = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
   const hasAccess = hasDashboardAccess(user);
   const section = requiredSection(pathname);
-  const canOpen = !section || Boolean(user?.is_superuser || user?.dashboard_permissions?.includes(section));
+  const canOpen = !section || Boolean(user?.is_superuser || user?.dashboard_permissions?.includes(section)
+    || section === 'adverts' && pathname.startsWith('/advertising') && user?.dashboard_permissions?.some(permission => permission.startsWith('advertising_') && permission !== 'advertising_settings')
+    || section === 'settings' && pathname === '/settings' && user?.dashboard_permissions?.includes('advertising_settings'));
   const fallback = [
     ['channels', '/channel-list'], ['content', '/content-list'], ['adverts', '/advert-list'],
     ['settings', '/settings'], ['users', '/user-management'],

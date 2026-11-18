@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, PageShell } from '@/components/page-shell';
+import { AdvertisingSettings } from '@/features/advertising/advertising-settings';
 import { useAuth } from '@/features/auth/context';
 
 export default function SettingsPage() {
@@ -19,7 +20,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent><Button render={<Link href="/homepage" />}>Manage homepage</Button></CardContent>
       </Card>}
-      <Card className="max-w-xl">
+      {(user?.is_superuser || user?.dashboard_permissions?.includes('settings')) && <Card className="max-w-xl">
         <CardHeader>
           <CardTitle>Homepage hero</CardTitle>
           <CardDescription>Set how long hero images stay on screen. Configure each slide in Adverts.</CardDescription>
@@ -27,7 +28,8 @@ export default function SettingsPage() {
         <CardContent>
           <Button render={<Link href="/hero-settings" />}>Manage hero settings</Button>
         </CardContent>
-      </Card>
+      </Card>}
+      <AdvertisingSettings />
     </PageShell>
   );
 }
